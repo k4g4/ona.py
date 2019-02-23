@@ -1,4 +1,3 @@
-from os import path
 from discord.ext import commands
 from .ona_context import OnaContext
 from .ona_configparser import OnaConfigParser
@@ -26,14 +25,14 @@ class Ona(commands.Bot, OnaEventsMixin, OnaUtilsMixin):
 
     @commands.command()
     async def reload(self, ctx):
-        for cog in self.config.cogs:
-            try:
+        try:
+            for cog in self.config.cogs:
                 self.unload_extension(cog)
                 self.load_extension(cog)
-            except Exception as e:
-                ctx.send(f"An error occurred: {e}")
-            else:
-                ctx.send(f"All commands were reloaded successfully.")
+        except Exception as e:
+            await ctx.send(f"An error occurred: {e}")
+        else:
+            await ctx.send(f"All commands were reloaded successfully.")
 
     def run(self):
         super().run(self.secrets.token)
