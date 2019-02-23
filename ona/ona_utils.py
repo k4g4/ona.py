@@ -1,8 +1,13 @@
 import discord
+from discord.ext import commands
 
 
 class OnaUtilsMixin:
     '''Various bot utilities are kept in this class.'''
+
+    # All errors that are displayed to the user instead of being logged
+    class OnaError(commands.CommandError):
+        pass
 
     def get(self, iterable, **attrs):
         return discord.utils.get(iterable, **attrs)
@@ -15,6 +20,9 @@ class OnaUtilsMixin:
         if author:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
         return embed
+
+    def plural(word, value):
+        return word if value == 1 else f"{word}s"
 
     async def log(self, content):
         print(content)
