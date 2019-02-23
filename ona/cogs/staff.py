@@ -19,6 +19,15 @@ class Staff:
         else:
             await ctx.send("Shutdown aborted.")
 
+    @commands.command()
+    @commands.check(is_admin)
+    async def eval(self, ctx, *expression: str):
+        '''Evaluate any Python expression.'''
+        try:
+            await ctx.send(str(eval(" ".join(expression))))
+        except Exception as e:
+            raise self.ona.OnaError(f"Error during eval: {e}")
+
 
 def setup(ona):
     ona.add_cog(Staff(ona))

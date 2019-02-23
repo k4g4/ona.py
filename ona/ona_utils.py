@@ -21,20 +21,27 @@ class OnaUtilsMixin:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
         return embed
 
+    @staticmethod
     def plural(word, value):
         return word if value == 1 else f"{word}s"
 
     async def log(self, content):
         print(content)
         logs = self.get_channel(self.config.logs)
-        await logs.send(embed=self.quick_embed(content))
+        await logs.send(embed=self.quick_embed(content, title="OnaLogger"))
 
 
 # Various command checks
 
 def is_staff(ctx):
-    return any(role.id in (ctx.config.admin, ctx.config.mod) for role in ctx.member.roles)
+    if hasattr(ctx.member, "roles"):
+        return any(role.id in (ctx.config.admin, ctx.config.mod) for role in ctx.member.roles)
+    else:
+        return ctx.member.id == ctx.config.owner
 
 
 def is_admin(ctx):
-    return any(role.id == ctx.config.admin for role in ctx.member.roles)
+    if hasattr(ctx.member, "roles"):
+        return any(role.id == ctx.config.admin for role in ctx.member.roles)
+    else:
+        return ctx.member.id == ctx.config.owner

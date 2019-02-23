@@ -32,7 +32,7 @@ class Ona(commands.Bot, OnaUtilsMixin):
                 self.unload_extension(cog)
                 self.load_extension(cog)
         except Exception as e:
-            raise self.OnaError(str(e))
+            raise self.OnaError(f"Error in {cog}: {e}")
         else:
             await ctx.send("All commands were reloaded successfully.")
 

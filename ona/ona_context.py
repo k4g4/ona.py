@@ -1,4 +1,5 @@
 import asyncio
+import discord
 from discord.ext import commands
 
 char_limit = 2000
@@ -27,15 +28,20 @@ class OnaContext(commands.Context):
         return self.message.guild if hasattr(self.message, "guild") else None
 
     async def send(self, content, yes_or_no=False, **kwargs):
-        # split the message into two messages if it's longer than the Discord character limit
-        if len(content) > char_limit:
-            super().send(content[:char_limit])
+        '''This custom send method adds special functionality such as sending messages over
+        the Discord character limit and asking the user a yes/no question.'''
+        # split the message into separate messages if it's longer than the Discord character limit
+        messages = []
+        while len(content) > char_limit:
+            messages.append(await super().send(content[:char_limit]))
             content = content[char_limit:]
         if not yes_or_no:
-            return await super().send(content, **kwargs)
+            messages.append(await super().send(content, **kwargs))
+            return messages[-1]
 
         # return True or False depending on which reaction the user chooses
         message = await super().send(content, **kwargs)
+        messages.append(message)
         await message.add_reaction("✅")
         await message.add_reaction("❌")
 
@@ -46,5 +52,16 @@ class OnaContext(commands.Context):
         except asyncio.TimeoutError:
             raise self.ona.OnaError("You took too long to react with ✅ or ❌.")
         finally:
-            await message.delete()
+            if isinstance(self.channel, discord.TextChannel):
+                await self.channel.delete_messages(messages)
         return reaction.emoji == "✅"
+
+    async def clean_up(self, *messages):
+        '''When done with a command, call clean_up with an argument-list of messages to delete them all
+        as well as the initial command message if Ona has permission.'''
+        if not isinstance(self.channel, discord.TextChannel):
+            return
+        if self.channel.permissions_for(self.guild.me).manage_messages:
+            messages += (self.message,)
+        await asyncio.sleep(self.config.short_delete_timer)
+        await self.channel.delete_messages(messages)

@@ -16,26 +16,28 @@ class Events:
         if message.author.bot:
             return
 
+    async def on_message_edit(self, before, after):
+        if after.author.bot:
+            return
+        await self.ona.process_commands(after)
+
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
             error = error.original
         if isinstance(error, commands.CommandOnCooldown):
             cooldown = round(error.retry_after) + 1
-            error_text = f"You need to wait {cooldown} more {ctx.ona.plural('second', cooldown)}."
+            error_text = f"You need to wait {cooldown} more {self.ona.plural('second', cooldown)}."
         elif isinstance(error, commands.CheckFailure):
             error_text = "You don't have permission to do that!"
-        elif isinstance(error, ctx.ona.OnaError):
+        elif isinstance(error, self.ona.OnaError):
             error_text = error
         else:
-            await ctx.ona.log(error)
+            await self.ona.log(str(error))
             return
 
-        error_message = await ctx.send(f"{error_text} {ctx.ona.get_emoji(ctx.config.error)}")
-        await asyncio.sleep(ctx.config.error_delete_timer)
-        try:
-            await ctx.channel.delete_messages([ctx.message, error_message])
-        except discord.Forbidden:
-            pass
+        error_message = await ctx.send(f"{error_text} {self.ona.get_emoji(ctx.config.error)}")
+        await asyncio.sleep(ctx.config.short_delete_timer)
+        await ctx.clean_up(error_message)
 
 
 def setup(ona):
