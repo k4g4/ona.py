@@ -26,7 +26,7 @@ class Events:
             error = error.original
         if isinstance(error, commands.CommandOnCooldown):
             cooldown = round(error.retry_after) + 1
-            error_text = f"You need to wait {cooldown} more {self.ona.plural('second', cooldown)}."
+            error_text = f"This command is on cooldown for {self.ona.plural('second', cooldown)}."
         elif isinstance(error, commands.CheckFailure):
             error_text = "You don't have permission to do that!"
         elif isinstance(error, self.ona.OnaError):

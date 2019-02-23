@@ -23,7 +23,7 @@ class OnaUtilsMixin:
 
     @staticmethod
     def plural(word, value):
-        return word if value == 1 else f"{word}s"
+        return f"one {word}" if value == 1 else f"{value:,} {word}s"
 
     async def log(self, content):
         print(content)
