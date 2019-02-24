@@ -59,7 +59,7 @@ class OnaContext(commands.Context):
             return
         if self.channel.permissions_for(self.me).manage_messages:
             messages += (self.message,)
-        await asyncio.sleep(self.config.short_delete_timer)
+        await asyncio.sleep(self.config.delete_timer)
         await self.channel.delete_messages(messages)
 
     async def whisper(self, *args, **kwargs):

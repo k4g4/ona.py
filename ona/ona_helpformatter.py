@@ -12,6 +12,8 @@ class OnaHelpFormatter(commands.HelpFormatter):
 
     async def format(self):
         description = self.command.help if hasattr(self.command, "help") else self.command.__doc__
+        if description is None:
+            description = "*No description provided.*"
         embed = discord.Embed(description=description, color=self.ona.config.ona_color)
         embed.set_author(name=self.ona.user.name, icon_url=self.ona.user.avatar_url)
         # The help page for a single command

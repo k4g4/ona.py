@@ -33,14 +33,11 @@ class Events:
         elif isinstance(error, commands.CheckFailure):
             error_text = "You don't have permission to do that!"
         elif isinstance(error, self.ona.OnaError):
-            error_text = error
+            error_text = str(error)
         else:
             await self.ona.log(str(error))
             return
-
-        error_message = await ctx.send(f"{error_text} {self.ona.get_emoji(ctx.config.error)}")
-        await asyncio.sleep(ctx.config.short_delete_timer)
-        await ctx.clean_up(error_message)
+        await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.get_emoji(ctx.config.error)}"))
 
 
 def setup(ona):
