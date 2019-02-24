@@ -9,13 +9,13 @@ __author__ = 'kaga'
 
 
 class Ona(commands.Bot, OnaUtilsMixin):
-    '''A multipurpose Discord bot.'''
+    '''A multipurpose Discord bot developed by Kaga#0690.'''
 
     def __init__(self):
         self.uptime = datetime.utcnow()
         self.config = OnaConfigParser("config.ini")
         self.secrets = OnaConfigParser("secrets.ini")
-        formatter = OnaHelpFormatter(self)
+        formatter = OnaHelpFormatter(self, width=self.config.help_width)
         super().__init__(command_prefix=self.config.command_prefix, formatter=formatter)
         self.add_command(self.reload)
         self.remove_command("help")

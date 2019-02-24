@@ -6,6 +6,7 @@ char_limit = 2000
 
 
 class OnaContext(commands.Context):
+    '''Custom Context class with some quality of life attributes.'''
 
     @property
     def ona(self):
@@ -14,6 +15,11 @@ class OnaContext(commands.Context):
     @property
     def config(self):
         return self.bot.config
+
+    def get_role_named(self, name):
+        '''Return a role in the context's guild if it exists, otherwise None.'''
+        if self.guild:
+            return self.ona.get(self.guild.roles, name=name)
 
     async def send(self, content="", yes_or_no=False, **kwargs):
         '''This custom send method adds special functionality such as sending messages over

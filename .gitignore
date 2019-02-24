@@ -1,1 +1,3 @@
 ona/config/secrets.ini
+__pycache__/
+*.py[cod]

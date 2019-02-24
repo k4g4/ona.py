@@ -22,7 +22,7 @@ class OnaUtilsMixin:
         return embed
 
     @staticmethod
-    def plural(word, value):
+    def plural(value, word):
         return f"one {word}" if value == 1 else f"{value:,} {word}s"
 
     async def log(self, content):
@@ -37,11 +37,11 @@ def is_staff(ctx):
     if hasattr(ctx.author, "roles"):
         return any(role.id in (ctx.config.admin, ctx.config.mod) for role in ctx.author.roles)
     else:
-        return ctx.author.id == ctx.application_info().owner
+        return ctx.ona.is_owner(ctx.author)
 
 
 def is_admin(ctx):
-    if hasattr(ctx.member, "roles"):
-        return any(role.id == ctx.config.admin for role in ctx.member.roles)
+    if hasattr(ctx.author, "roles"):
+        return any(role.id == ctx.config.admin for role in ctx.author.roles)
     else:
-        return ctx.member.id == ctx.config.owner
+        return ctx.author.id == ctx.config.owner

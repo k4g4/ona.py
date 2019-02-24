@@ -17,7 +17,7 @@ class Events:
             if sinner not in user.roles and virgin in user.roles:
                 await user.add_roles(sinner)
                 print(user)
-                await asyncio.sleep(.5)
+                await asyncio.sleep(.2)
 
     async def on_message(self, message):
         if message.author.bot:
@@ -33,7 +33,7 @@ class Events:
             error = error.original
         if isinstance(error, commands.CommandOnCooldown):
             cooldown = round(error.retry_after) + 1
-            error_text = f"This command is on cooldown for {self.ona.plural('second', cooldown)}."
+            error_text = f"This command is on cooldown for {self.ona.plural(cooldown, 'second')}."
         elif isinstance(error, commands.CheckFailure):
             error_text = "You don't have permission to do that!"
         elif isinstance(error, self.ona.OnaError):

@@ -8,6 +8,9 @@ class Staff:
     def __init__(self, ona):
         self.ona = ona
 
+    def cog_check(self, ctx):
+        return is_staff(ctx)
+
     @commands.command(aliases=["shutdown"])
     @commands.check(is_admin)
     async def close(self, ctx):
@@ -20,7 +23,7 @@ class Staff:
             await ctx.send("Shutdown aborted.")
 
     @commands.command()
-    @commands.check(is_admin)
+    @commands.cooldown(5, 10, commands.BucketType.user)
     async def eval(self, ctx, *expression: str):
         '''Evaluate any Python expression.'''
         try:

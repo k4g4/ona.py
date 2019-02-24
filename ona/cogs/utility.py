@@ -15,9 +15,9 @@ class Utility:
         '''Check Ona's response time.'''
         start = time.time()
         message = await ctx.send("My ping is...")
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
         end = time.time()
-        await message.edit(content=f"My ping is... **{round((end-start-3) * 1000, 2)}** milliseconds.")
+        await message.edit(content=f"My ping is... **{round((end-start-2) * 1000, 2)}** milliseconds.")
         await ctx.clean_up(message)
 
     @commands.command()
@@ -31,12 +31,12 @@ class Utility:
     async def help(self, ctx, command_name: str = None):
         '''Display help for any or all of Ona's commands.'''
         if command_name:
-            if command_name in self.ona.cogs:
-                command = self.ona.cogs[command_name.lower()]
+            if command_name.title() in self.ona.cogs:
+                command = self.ona.cogs[command_name.title()]
             else:
                 command = self.ona.get(self.ona.commands, name=command_name.lower())
-                ctx.ona_assert(command is not None, error="That is not a valid command name.")
-                await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
+            ctx.ona_assert(command is not None, error="That is not a valid command name.")
+            await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
         else:
             await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
 
