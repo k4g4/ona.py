@@ -1,7 +1,9 @@
 import time
 import asyncio
+import discord
 from datetime import datetime, timedelta
 from discord.ext import commands
+from ona.ona_utils import in_server
 
 
 class Utility:
@@ -27,15 +29,28 @@ class Utility:
         uptime = self.ona.plural('day', delta.days) if delta.days else self.ona.plural('second', delta.seconds)
         await ctx.clean_up(await ctx.send(f"I've been running for {uptime}."))
 
-    @commands.command()
+    @commands.command(aliases=["commands"])
     async def help(self, ctx, command_name: str = None):
         '''Display help for any or all of Ona's commands.'''
         if command_name:
-            command = self.ona.get(self.ona.commands, name=command_name.lower())
+            command = next(cmd for cmd in self.ona.commands if command_name.lower() in [cmd.name] + cmd.aliases)
             ctx.ona_assert(command is not None, error="That is not a valid command name.")
             await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
         else:
             await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
+
+    @commands.command()
+    @commands.check(in_server)
+    async def members(self, ctx):
+        '''See how many members are in the server.'''
+        await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {ctx.ona.get_emoji_named('heartEyes')}")
+
+    @commands.command(aliases=["avi", "pfp"])
+    async def avatar(self, ctx, *, member: discord.Member = None):
+        '''Display a user's avatar.'''
+        member = member if member else ctx.author
+        with self.ona.download(member.avatar_url_as(static_format="png", size=256)) as avatar:
+            await ctx.send(f"{member.display_name}'s avatar:", file=discord.File(avatar))
 
 
 def setup(ona):

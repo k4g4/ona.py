@@ -64,11 +64,13 @@ class OnaContext(commands.Context):
 
     async def whisper(self, *args, **kwargs):
         """DM a user instead of sending a message to the chat."""
+        message = await self.author.send(*args, **kwargs)
         if isinstance(self.channel, discord.TextChannel):
             await self.clean_up(await self.send(f"{self.author.mention} Check your DM!"))
-        return await self.author.send(*args, **kwargs)
+        return message
 
     def ona_assert(self, *assertions, error):
         '''Assert that all provided assertions are True. If one is False, raise an OnaError.'''
         if not all(assertions):
             raise self.ona.OnaError(error)
+        return True
