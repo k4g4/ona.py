@@ -22,6 +22,9 @@ class OnaContext(commands.Context):
         if self.guild:
             return self.ona.get(self.guild.roles, name=name)
 
+    def has_role(self, role_id):
+        return any(role.id == role_id for role in ctx.author.roles)
+
     async def send(self, content="", yes_or_no=False, **kwargs):
         '''This custom send method adds special functionality such as sending messages over
         the Discord character limit and asking the user a yes/no question.'''
