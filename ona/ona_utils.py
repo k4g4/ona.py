@@ -16,7 +16,7 @@ class OnaUtilsMixin:
         return self.get(self.emojis, name=name)
 
     def quick_embed(self, content, *, title=None, author=None):
-        embed = discord.Embed(description=content, title=title, color=self.config.color)
+        embed = discord.Embed(description=content, title=title, color=self.config.ona_color)
         if author:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
         return embed
@@ -34,10 +34,10 @@ class OnaUtilsMixin:
 # Various command checks
 
 def is_staff(ctx):
-    if hasattr(ctx.member, "roles"):
-        return any(role.id in (ctx.config.admin, ctx.config.mod) for role in ctx.member.roles)
+    if hasattr(ctx.author, "roles"):
+        return any(role.id in (ctx.config.admin, ctx.config.mod) for role in ctx.author.roles)
     else:
-        return ctx.member.id == ctx.config.owner
+        return ctx.author.id == ctx.application_info().owner
 
 
 def is_admin(ctx):

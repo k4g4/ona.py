@@ -2,6 +2,7 @@ from datetime import datetime
 from discord.ext import commands
 from .ona_context import OnaContext
 from .ona_configparser import OnaConfigParser
+from .ona_helpformatter import OnaHelpFormatter
 from .ona_utils import OnaUtilsMixin, is_staff
 
 __author__ = 'kaga'
@@ -14,8 +15,10 @@ class Ona(commands.Bot, OnaUtilsMixin):
         self.uptime = datetime.utcnow()
         self.config = OnaConfigParser("config.ini")
         self.secrets = OnaConfigParser("secrets.ini")
-        super().__init__(command_prefix=self.config.command_prefix)
+        formatter = OnaHelpFormatter(self)
+        super().__init__(command_prefix=self.config.command_prefix, formatter=formatter)
         self.add_command(self.reload)
+        self.remove_command("help")
         for cog in self.config.cogs:
             try:
                 self.load_extension(cog)

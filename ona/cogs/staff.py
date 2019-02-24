@@ -14,8 +14,8 @@ class Staff:
         '''Completely shut down Ona.'''
         if await ctx.send("Are you sure you'd like me to shut down?", yes_or_no=True):
             await ctx.send("Shutting down...")
-            await ctx.ona.wait_until_ready()
-            await ctx.ona.close()
+            await self.ona.wait_until_ready()
+            await self.ona.close()
         else:
             await ctx.send("Shutdown aborted.")
 

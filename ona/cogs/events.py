@@ -11,6 +11,13 @@ class Events:
 
     async def on_ready(self):
         await self.ona.log("I am now logged in!")
+        virgin = next(role for role in self.ona.guilds[0].roles if "1. Virgin" == role.name)
+        sinner = next(role for role in self.ona.guilds[0].roles if "Ⅰ) SINNER" == role.name)
+        for user in self.ona.guilds[0].members:
+            if sinner not in user.roles and virgin in user.roles:
+                await user.add_roles(sinner)
+                print(user)
+                await asyncio.sleep(.5)
 
     async def on_message(self, message):
         if message.author.bot:

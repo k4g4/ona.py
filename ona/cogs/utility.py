@@ -27,6 +27,19 @@ class Utility:
         uptime = self.ona.plural('day', delta.days) if delta.days else self.ona.plural('second', delta.seconds)
         await ctx.clean_up(await ctx.send(f"I've been running for {uptime}."))
 
+    @commands.command()
+    async def help(self, ctx, command_name: str = None):
+        '''Display help for any or all of Ona's commands.'''
+        if command_name:
+            if command_name in self.ona.cogs:
+                command = self.ona.cogs[command_name.lower()]
+            else:
+                command = self.ona.get(self.ona.commands, name=command_name.lower())
+                ctx.ona_assert(command is not None, error="That is not a valid command name.")
+                await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
+        else:
+            await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
+
 
 def setup(ona):
     ona.add_cog(Utility(ona))
