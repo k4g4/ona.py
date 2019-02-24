@@ -1,5 +1,5 @@
 from discord.ext import commands
-from ona.ona_utils import is_staff, is_admin
+from ona.ona_utils import is_staff, is_admin, is_owner
 
 
 class Staff:
@@ -12,7 +12,7 @@ class Staff:
         return is_staff(ctx)
 
     @commands.command(aliases=["shutdown"])
-    @commands.check(is_admin)
+    @commands.check(is_owner)
     async def close(self, ctx):
         '''Completely shut down Ona.'''
         if await ctx.send("Are you sure you'd like me to shut down?", yes_or_no=True):
@@ -23,7 +23,7 @@ class Staff:
             await ctx.send("Shutdown aborted.")
 
     @commands.command()
-    @commands.cooldown(5, 10, commands.BucketType.user)
+    @commands.check(is_owner)
     async def eval(self, ctx, *expression: str):
         '''Evaluate any Python expression.'''
         try:

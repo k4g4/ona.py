@@ -14,6 +14,7 @@ class OnaContext(commands.Context):
 
     @property
     def config(self):
+        # TODO: make the config vary based on which server the ctx is in
         return self.bot.config
 
     def get_role_named(self, name):

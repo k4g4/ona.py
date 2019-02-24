@@ -3,7 +3,7 @@ from discord.ext import commands
 from .ona_context import OnaContext
 from .ona_configparser import OnaConfigParser
 from .ona_helpformatter import OnaHelpFormatter
-from .ona_utils import OnaUtilsMixin, is_staff
+from .ona_utils import OnaUtilsMixin, is_owner
 
 __author__ = 'kaga'
 
@@ -30,7 +30,7 @@ class Ona(commands.Bot, OnaUtilsMixin):
         await self.invoke(ctx)
 
     @commands.command()
-    @commands.check(is_staff)
+    @commands.check(is_owner)
     async def reload(self, ctx):
         '''Update code for all commands, reload config settings, and refresh all cooldowns.'''
         self.config = OnaConfigParser("config.ini")

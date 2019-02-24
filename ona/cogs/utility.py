@@ -31,10 +31,7 @@ class Utility:
     async def help(self, ctx, command_name: str = None):
         '''Display help for any or all of Ona's commands.'''
         if command_name:
-            if command_name.title() in self.ona.cogs:
-                command = self.ona.cogs[command_name.title()]
-            else:
-                command = self.ona.get(self.ona.commands, name=command_name.lower())
+            command = self.ona.get(self.ona.commands, name=command_name.lower())
             ctx.ona_assert(command is not None, error="That is not a valid command name.")
             await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
         else:
