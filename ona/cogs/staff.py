@@ -15,7 +15,7 @@ class Staff:
     @commands.check(is_owner)
     async def close(self, ctx):
         '''Completely shut down Ona.'''
-        if await ctx.send("Are you sure you'd like me to shut down?", yes_or_no=True):
+        if await ctx.yes_or_no("Are you sure you'd like me to shut down?"):
             await ctx.send("Shutting down...")
             await self.ona.wait_until_ready()
             await self.ona.close()

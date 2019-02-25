@@ -25,32 +25,86 @@ class OnaContext(commands.Context):
     def has_role(self, role_id):
         return any(role.id == role_id for role in ctx.author.roles)
 
-    async def send(self, content="", yes_or_no=False, **kwargs):
-        '''This custom send method adds special functionality such as sending messages over
-        the Discord character limit and asking the user a yes/no question.'''
-        # split the message into separate messages if it's longer than the Discord character limit
-        while len(content) > char_limit:
-            await super().send(content[:char_limit])
-            content = content[char_limit:]
-        if not yes_or_no:
-            message = await super().send(content, **kwargs)
-            return message
+    async def send(self, content="", multi=False, **kwargs):
+        '''This custom send method adds the ability to send messages larger than the
+        Discord character limit.'''
+        if multi:
+            while len(content) > char_limit:
+                await super().send(content[:char_limit])
+                content = content[char_limit:]
+        return await super().send(content, **kwargs)
 
-        # return True or False depending on which reaction the user chooses
-        message = await super().send(content, **kwargs)
+    async def yes_or_no(self, *args, **kwargs):
+        '''Ask the user a True or False question and return the resulting bool.'''
+        message = await self.send(*args, **kwargs)
         await message.add_reaction("✅")
         await message.add_reaction("❌")
 
-        def check(reaction, user):
-            return reaction.message.id == message.id and user == self.author and reaction.emoji in "✅❌"
+        def check(r, u):
+            return r.message.id == message.id and u == self.author and r.emoji in "✅❌"
         try:
-            reaction, _ = await self.ona.wait_for('reaction_add', timeout=self.config.response_timeout, check=check)
+            timeout = self.config.response_timeout
+            reaction, _ = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
         except asyncio.TimeoutError:
             raise self.ona.OnaError("You took too long to react with ✅ or ❌.")
         finally:
-            if isinstance(self.channel, discord.TextChannel):
-                await self.channel.delete_messages(messages)
+            await message.delete()
         return reaction.emoji == "✅"
+
+    async def ask(self, content="", options=[], *, use_embed=False, embed=None, **kwargs):
+        '''Ask the user for a response from a list of options and return the position of the chosen option.
+        If no option list is provided, return any response from the user as a string.'''
+        for i, option in enumerate(options, 1):
+            row = f"\n:white_small_square: {i}) {option}"
+            if use_embed:
+                embed.description += row
+            else:
+                content += row
+        message = await self.send(content, embed=embed, **kwargs)
+
+        def check(m):
+            if m.author != self.author:
+                return False
+            return not options or m.content.isdigit() and int(m.content) <= len(options)
+        try:
+            timeout = self.config.response_timeout
+            response = await self.ona.wait_for("message", timeout=timeout, check=check)
+        except asyncio.TimeoutError:
+            raise self.ona.OnaError("You took too long to respond.")
+        finally:
+            if isinstance(self.channel, discord.TextChannel):
+                if self.channel.permissions_for(self.me).manage_messages:
+                    await self.channel.delete_messages([message, response])
+        if options:
+            return int(response.content) - 1    # The returned value is an index of the options list
+        return response.content     # No options were provided
+
+    async def embed_browser(self, embeds, pos=0):
+        '''Send a list of embeds to display each one along with reaction based controls to navigate through
+        them. The start parameter decides which embed should be shown first.'''
+        self.ona_assert(isinstance(self.channel, discord.TextChannel),
+                        self.channel.permissions_for(self.me).manage_messages,
+                        error="I need the `Manage Messages` permission to do that.")
+        message = await self.send(embed=embeds[pos])
+        await message.add_reaction("⬅")
+        await message.add_reaction("➡")
+
+        def check(r, u):
+            return r.message.id == message.id and not u.bot and r.emoji in "⬅➡"
+        while True:
+            try:
+                timeout = self.config.response_timeout
+                reaction, user = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
+            except asyncio.TimeoutError:
+                break
+            await message.remove_reaction(reaction.emoji, user)
+            if user == self.author:
+                # increment or decrement the position according to the reaction, unless at either end of the list
+                pos += 1 if reaction.emoji == "➡" and pos < len(embeds) - 1 else 0
+                pos -= 1 if reaction.emoji == "⬅" and pos > 0 else 0
+                await message.edit(embed=embeds[pos])
+        await message.clear_reactions()
+        return message
 
     async def clean_up(self, *messages):
         '''When done with a command, call clean_up with an argument-list of messages to delete them all

@@ -35,7 +35,7 @@ class Events:
         elif isinstance(error, self.ona.OnaError):
             error_text = str(error)
         else:
-            await self.ona.log(str(error))
+            await self.ona.log(f"Error: {error}")
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.get_emoji(ctx.config.error)}"))
 

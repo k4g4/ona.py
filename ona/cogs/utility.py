@@ -3,6 +3,7 @@ import asyncio
 import requests
 import discord
 from datetime import datetime, timedelta
+from json import loads
 from html.parser import HTMLParser
 from discord.ext import commands
 from ona.ona_utils import in_server
@@ -82,6 +83,30 @@ class Utility:
                 embed.add_field(name=member.activity.type.name.title(), value=member.activity.name)
         await ctx.send(embed=embed)
 
+    @commands.command()
+    async def osu(self, ctx, *username: str):
+        '''Search for an osu! profile. Provide either an osu! username or user id.'''
+        username = " ".join(username) if username else await ctx.ask("Provide a username to search for:")
+        mode = await ctx.ask("Choose a gamemode:", ["Standard", "Taiko", "Catch the Beat", "Mania"])
+        params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
+        res = requests.get("https://osu.ppy.sh/api/get_user", params=params)
+        ctx.ona_assert(res.text != "[]", error="The username/id provided is invalid.")
+        osu_user = loads(res.text)[0]
+        # All stats are strings by default. Convert to python objects.
+        osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in osu_user.items()}
+        url = f"https://osu.ppy.sh/osu_users/{osu_user['user_id']}"
+        stats = [
+            ("Rank", f"{osu_user['pp_rank']:,} ({osu_user['pp_country_rank']:,} {osu_user['country']})"),
+            ("Level", int(osu_user["level"])),
+            ("Performance Points", f"{int(osu_user['pp_raw']):,}"),
+            ("Accuracy", round(osu_user["accuracy"], 2)),
+            ("Playcount", f"{osu_user['playcount']:,}"),
+            ("Ranked Score", f"{osu_user['ranked_score']:,}")
+        ]
+        embed = self.ona.quick_embed(title=f"{osu_user['username']}'s Stats", url=url, fields=stats)
+        embed.set_thumbnail(url=f"https://a.ppy.sh/{osu_user['user_id']}")
+        await ctx.send(embed=embed)
+
     @commands.command(aliases=["sauce"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def source(self, ctx, url: str = None):
@@ -94,8 +119,8 @@ class Utility:
             ctx.ona_assert(message is not None, error="No image was provided.")
             url = message.attachments[0].url
         loop = asyncio.get_event_loop()
-        req = await loop.run_in_executor(None, requests.post, "http://iqdb.org", {"url": url})
-        ctx.ona_assert("No relevant matches" not in req.text, "HTTP request failed" not in req.text,
+        res = await loop.run_in_executor(None, requests.post, "http://iqdb.org", {"url": url})
+        ctx.ona_assert("No relevant matches" not in res.text, "HTTP request failed" not in res.text,
                        error="No results found.")
         parser = HTMLParser()
         urls = []
@@ -104,7 +129,7 @@ class Utility:
         def handler(tag, attrs):
             any(urls.append(attr[1]) for attr in attrs if attr[0] == "href")
         parser.handle_starttag = handler
-        parser.feed(req.text)
+        parser.feed(res.text)
         url = urls[2]   # The second href is the "best match"
         if url.startswith("//"):
             url = f"https:{url}"

@@ -12,8 +12,8 @@ class OnaHelpFormatter(commands.HelpFormatter):
 
     async def format(self):
         description = self.command.help if hasattr(self.command, "help") else self.command.__doc__
-        if description is None:
-            description = "*No description provided.*"
+        no_desc = "*No description provided.*"
+        description = description if description else no_desc
         embed = discord.Embed(description=description, color=self.ona.config.ona_color)
         embed.set_author(name=self.ona.user.name, icon_url=self.ona.user.avatar_url)
         # The help page for a single command
@@ -30,7 +30,7 @@ class OnaHelpFormatter(commands.HelpFormatter):
             return cmd[1].cog_name
 
         def cmd_format(name, cmd):
-            return f"**{name}**: {self.shorten(cmd.help)}"
+            return f"**{name}**: {self.shorten(cmd.help) if cmd.help else no_desc}"
 
         for cog, cmds in groupby(sorted(await self.filter_command_list(), key=key), key=key):
             cmds = list(cmds)

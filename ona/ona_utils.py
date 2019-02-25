@@ -19,10 +19,12 @@ class OnaUtilsMixin:
     def get_emoji_named(self, name):
         return self.get(self.emojis, name=name)
 
-    def quick_embed(self, content, *, title=None, author=None):
-        embed = discord.Embed(description=content, title=title, color=self.config.ona_color)
+    def quick_embed(self, content="", *, title=None, url=None, author=None, fields=[]):
+        embed = discord.Embed(description=content, title=title, url=url, color=self.config.ona_color)
         if author:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
+        for field in fields:
+            embed.add_field(name=field[0], value=field[1])
         return embed
 
     @staticmethod
@@ -35,7 +37,7 @@ class OnaUtilsMixin:
     def download(url):
         '''This helper coroutine downloads a file from a url and yields it to a context manager,
         then deletes the file once the context manager exits.'''
-        filename = os.path.split(url)[1].partition('size')[0]
+        filename = os.path.split(url)[1].partition("size")[0]
         req = requests.get(url, headers={"User-Agent": "Ona Agent"})
         with open(filename, 'wb') as fd:
             for chunk in req.iter_content(chunk_size=128):
@@ -47,7 +49,7 @@ class OnaUtilsMixin:
 
     async def log(self, content):
         print(content)
-        logs = self.get_channel(self.config.logs)
+        logs = self.get_guild(self.config.server).get_channel(self.config.logs)
         await logs.send(embed=self.quick_embed(content, title="OnaLogger"))
 
 
