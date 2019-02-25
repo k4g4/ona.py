@@ -41,7 +41,7 @@ class Ona(commands.Bot, OnaUtilsMixin):
         except Exception as e:
             raise self.OnaError(f"Error in {cog}: {e}")
         else:
-            await ctx.send("All commands were reloaded successfully.")
+            await ctx.clean_up(await ctx.send("All commands were reloaded successfully."))
 
     def run(self):
         super().run(self.secrets.token)

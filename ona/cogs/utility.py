@@ -83,10 +83,43 @@ class Utility:
                 embed.add_field(name=member.activity.type.name.title(), value=member.activity.name)
         await ctx.send(embed=embed)
 
+    @commands.command(aliases=["search", "g"])
+    @commands.cooldown(2, 20, commands.BucketType.user)
+    async def google(self, ctx, *query: str):
+        '''Search for anything on Google.'''
+        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
+        results = [(item["title"], item["link"]) for item in self.ona.search(query)]
+        embeds = []
+        per_page = 5
+        for i in range(0, len(results), per_page):
+            embed = self.ona.quick_embed(title="Search Results", author=ctx.author, fields=results[i:i+per_page])
+            embeds.append(embed.set_thumbnail(url="https://i.imgur.com/oRN5hP2.png"))
+        await ctx.embed_browser(embeds)
+
+    @commands.command(aliases=["img", "image"])
+    @commands.cooldown(2, 20, commands.BucketType.user)
+    async def imagesearch(self, ctx, *query: str):
+        '''Search for any image using Google.'''
+        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
+        results = self.ona.search(query, image=True)
+        embeds = []
+        for result in results:
+            embed = self.ona.quick_embed(result["title"], title="Search Results", author=ctx.author)
+            embeds.append(embed.set_image(url=result["link"]))
+        await ctx.embed_browser(embeds)
+
+    @commands.command(aliases=["yt"])
+    @commands.cooldown(2, 20, commands.BucketType.user)
+    async def youtube(self, ctx, *query: str):
+        '''Search for a video on YouTube.'''
+        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
+        query = f"youtube {query}"
+        await ctx.send(next(item["link"] for item in self.ona.search(query) if "youtube.com/watch" in item["link"]))
+
     @commands.command()
     async def osu(self, ctx, *username: str):
         '''Search for an osu! profile. Provide either an osu! username or user id.'''
-        username = " ".join(username) if username else await ctx.ask("Provide a username to search for:")
+        username = " ".join(username) if username else await ctx.ask("Give a username to search for:")
         mode = await ctx.ask("Choose a gamemode:", ["Standard", "Taiko", "Catch the Beat", "Mania"])
         params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
         res = requests.get("https://osu.ppy.sh/api/get_user", params=params)

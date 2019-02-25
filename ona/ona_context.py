@@ -54,6 +54,8 @@ class OnaContext(commands.Context):
     async def ask(self, content="", options=[], *, use_embed=False, embed=None, **kwargs):
         '''Ask the user for a response from a list of options and return the position of the chosen option.
         If no option list is provided, return any response from the user as a string.'''
+        if embed:
+            embed.description = embed.description if embed.description else ""
         for i, option in enumerate(options, 1):
             row = f"\n:white_small_square: {i}) {option}"
             if use_embed:
@@ -85,6 +87,9 @@ class OnaContext(commands.Context):
         self.ona_assert(isinstance(self.channel, discord.TextChannel),
                         self.channel.permissions_for(self.me).manage_messages,
                         error="I need the `Manage Messages` permission to do that.")
+        # Add page numbers to each embed
+        for i, embed in enumerate(embeds, 1):
+            embed.set_footer(text=f"Page {i} of {len(embeds)}")
         message = await self.send(embed=embeds[pos])
         await message.add_reaction("⬅")
         await message.add_reaction("➡")

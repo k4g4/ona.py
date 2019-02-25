@@ -3,6 +3,7 @@ import requests
 import discord
 from contextlib import contextmanager
 from datetime import timedelta, datetime
+from json import loads
 from discord.ext import commands
 
 
@@ -20,12 +21,20 @@ class OnaUtilsMixin:
         return self.get(self.emojis, name=name)
 
     def quick_embed(self, content="", *, title=None, url=None, author=None, fields=[]):
+        '''An embed factory method.'''
         embed = discord.Embed(description=content, title=title, url=url, color=self.config.ona_color)
         if author:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
         for field in fields:
             embed.add_field(name=field[0], value=field[1])
         return embed
+
+    def search(self, query, image=False):
+        '''Search Google with a query. Retrieve image results if image=True.'''
+        params = {"q": query, "key": self.secrets.google_key, "cx": self.secrets.google_engine_id}
+        if image:
+            params["searchType"] = "image"
+        return loads(requests.get("https://www.googleapis.com/customsearch/v1", params=params).text)["items"]
 
     @staticmethod
     def plural(value, word):
