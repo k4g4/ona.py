@@ -17,9 +17,6 @@ class OnaUtilsMixin:
     def get(self, iterable, **attrs):
         return discord.utils.get(iterable, **attrs)
 
-    def get_emoji_named(self, name):
-        return self.get(self.emojis, name=name)
-
     def quick_embed(self, content="", *, title=None, url=None, author=None, fields=[]):
         '''An embed factory method.'''
         embed = discord.Embed(description=content, title=title, url=url, color=self.config.ona_color)
@@ -66,12 +63,12 @@ class OnaUtilsMixin:
 
 def is_staff(ctx):
     if hasattr(ctx.author, "roles"):
-        return ctx.has_role(ctx.config.admin) or ctx.has_role(ctx.config.mod)
+        return ctx.has_any_role(ctx.config.admins) or ctx.has_role(ctx.config.mods)
 
 
 def is_admin(ctx):
     if hasattr(ctx.author, "roles"):
-        return ctx.has_role(ctx.config.admin)
+        return ctx.has_any_role(ctx.config.admins)
 
 
 def is_owner(ctx):

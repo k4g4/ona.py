@@ -14,8 +14,8 @@ class OnaHelpFormatter(commands.HelpFormatter):
         description = self.command.help if hasattr(self.command, "help") else self.command.__doc__
         no_desc = "*No description provided.*"
         description = description if description else no_desc
-        embed = discord.Embed(description=description, color=self.ona.config.ona_color)
-        embed.set_author(name=self.ona.user.name, icon_url=self.ona.user.avatar_url)
+        embed = discord.Embed(description=description, title=self.ona.user.name, color=self.ona.config.ona_color)
+        embed.set_thumbnail(url=self.ona.user.avatar_url)
         # The help page for a single command
         if isinstance(self.command, commands.Command):
             embed.title = self.get_command_signature()

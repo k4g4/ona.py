@@ -46,7 +46,7 @@ class Utility:
     @commands.check(in_server)
     async def members(self, ctx):
         '''See how many members are in the server.'''
-        await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {ctx.ona.get_emoji_named('heartEyes')}")
+        await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {self.ona.get_emoji(ctx.config.hearteyes)}")
 
     @commands.command(aliases=["avi", "pfp"])
     async def avatar(self, ctx, *, member: discord.Member = None):
@@ -63,7 +63,7 @@ class Utility:
 
     @commands.command(aliases=["info", "userinfo"])
     async def user(self, ctx, member: discord.Member = None):
-        '''Get info about a user.'''
+        '''See information about a user.'''
         member = member if member else ctx.author
         if hasattr(member, "roles"):
             roles = f"**Roles:** {', '.join(role.name for role in member.roles[1:][::-1])}"
@@ -85,6 +85,7 @@ class Utility:
 
     @commands.command(aliases=["search", "g"])
     @commands.cooldown(2, 20, commands.BucketType.user)
+    @commands.check(in_server)
     async def google(self, ctx, *query: str):
         '''Search for anything on Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
@@ -98,6 +99,7 @@ class Utility:
 
     @commands.command(aliases=["img", "image"])
     @commands.cooldown(2, 20, commands.BucketType.user)
+    @commands.check(in_server)
     async def imagesearch(self, ctx, *query: str):
         '''Search for any image using Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
@@ -145,12 +147,7 @@ class Utility:
     async def source(self, ctx, url: str = None):
         '''Reverse image search any image. Either attach an image, post its url, or use the
         most recently posted image in the channel.'''
-        if ctx.message.attachments:
-            url = ctx.message.attachments[0].url
-        if url is None:
-            message = await ctx.history().find(lambda message: len(message.attachments))
-            ctx.ona_assert(message is not None, error="No image was provided.")
-            url = message.attachments[0].url
+        url = await handle_file_url(url)
         loop = asyncio.get_event_loop()
         res = await loop.run_in_executor(None, requests.post, "http://iqdb.org", {"url": url})
         ctx.ona_assert("No relevant matches" not in res.text, "HTTP request failed" not in res.text,
@@ -158,13 +155,12 @@ class Utility:
         parser = HTMLParser()
         urls = []
 
-        # This handler parses the iqdb.org response html for all href links
-        def handler(tag, attrs):
+        def handler(tag, attrs):    # This handler parses the iqdb.org response html for all href links
             any(urls.append(attr[1]) for attr in attrs if attr[0] == "href")
         parser.handle_starttag = handler
         parser.feed(res.text)
         url = urls[2]   # The second href is the "best match"
-        if url.startswith("//"):
+        if url.startswith("//"):    # Fix links
             url = f"https:{url}"
         await ctx.send(f"Here's the closest match:\n{url}")
 

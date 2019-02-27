@@ -25,13 +25,18 @@ class OnaContext(commands.Context):
     def has_role(self, role_id):
         return any(role.id == role_id for role in ctx.author.roles)
 
-    async def send(self, content="", multi=False, **kwargs):
+    def has_any_role(self, role_ids):
+        return any(role.id in role_ids for role in ctx.author.roles)
+
+    async def send(self, content="", *, multi=False, file_url=None, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
         Discord character limit.'''
         if multi:
             while len(content) > char_limit:
                 await super().send(content[:char_limit])
                 content = content[char_limit:]
+        if file_url:
+            kwargs["file"] = discord.File(file_url)
         return await super().send(content, **kwargs)
 
     async def yes_or_no(self, *args, **kwargs):
@@ -133,3 +138,15 @@ class OnaContext(commands.Context):
         if not all(assertions):
             raise self.ona.OnaError(error)
         return True
+
+    async def handle_file_url(self, url):
+        '''For commands that require a file url, Ona first checks if the user attached a file.
+        If no file was attached and no file url was given, Ona searches chat history for
+        the most recent file attachment.'''
+        if self.message.attachments:
+            return self.message.attachments[0].url
+        if url:
+            return url
+        message = await self.history().find(lambda m: len(m.attachments))
+        self.ona_assert(message is not None, error="No image was provided.")
+        return message.attachments[0].url
