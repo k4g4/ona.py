@@ -3,7 +3,7 @@ from discord.ext import commands
 from .context import OnaContext
 from .configparser import OnaConfigParser
 from .helpformatter import OnaHelpFormatter
-from .utils import OnaUtilsMixin, is_owner
+from .utils import OnaUtilsMixin, is_owner, not_blacklisted, not_silenced
 
 __author__ = 'kaga'
 
@@ -19,6 +19,8 @@ class Ona(commands.Bot, OnaUtilsMixin):
         super().__init__(command_prefix=self.config.command_prefix, formatter=formatter)
         self.add_command(self.reload)
         self.remove_command("help")
+        self.add_check(not_blacklisted)
+        self.add_check(not_silenced)
         for cog in self.config.cogs:
             try:
                 self.load_extension(cog)

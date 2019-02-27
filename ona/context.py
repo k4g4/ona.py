@@ -14,7 +14,7 @@ class OnaContext(commands.Context):
 
     @property
     def config(self):
-        # TODO: make the config vary based on which server the ctx is in
+        # TODO: make the config vary based on which server the ctx is in, if attribute is not in db then raise error
         return self.bot.config
 
     def get_role_named(self, name):
@@ -28,15 +28,15 @@ class OnaContext(commands.Context):
     def has_any_role(self, role_ids):
         return any(role.id in role_ids for role in ctx.author.roles)
 
-    async def send(self, content="", *, multi=False, file_url=None, **kwargs):
+    async def send(self, content="", *, multi=False, filename=None, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
         Discord character limit.'''
         if multi:
             while len(content) > char_limit:
                 await super().send(content[:char_limit])
                 content = content[char_limit:]
-        if file_url:
-            kwargs["file"] = discord.File(file_url)
+        if filename:
+            kwargs["file"] = discord.File(filename)
         return await super().send(content, **kwargs)
 
     async def yes_or_no(self, *args, **kwargs):
@@ -62,7 +62,7 @@ class OnaContext(commands.Context):
         if embed:
             embed.description = embed.description if embed.description else ""
         for i, option in enumerate(options, 1):
-            row = f"\n:white_small_square: {i}) {option}"
+            row = f"\n▫ {i}) {option}"
             if use_embed:
                 embed.description += row
             else:

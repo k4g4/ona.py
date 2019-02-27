@@ -61,33 +61,50 @@ class OnaUtilsMixin:
 
 # Various command checks
 
-def is_staff(ctx):
-    if hasattr(ctx.author, "roles"):
-        return ctx.has_any_role(ctx.config.admins) or ctx.has_role(ctx.config.mods)
-
-
-def is_admin(ctx):
-    if hasattr(ctx.author, "roles"):
-        return ctx.has_any_role(ctx.config.admins)
-
-
 def is_owner(ctx):
     return ctx.ona.is_owner(ctx.author)
 
 
 def in_server(ctx):
-    return ctx.ona_assert(ctx.guild, error="You need to be in a server to use this command.")
+    return ctx.ona_assert(ctx.guild or is_owner(ctx), error="You need to be in a server to use this command.")
+
+
+def is_staff(ctx):
+    in_server(ctx)
+    return ctx.ona_assert(ctx.has_any_role(ctx.config.admins) or ctx.has_any_role(ctx.config.mods) or is_owner(ctx),
+                          error="You need to be a `Moderator` to use this command.")
+
+
+def is_admin(ctx):
+    in_server(ctx)
+    return ctx.ona_assert(ctx.has_any_role(ctx.config.admins) or is_owner(ctx),
+                          error="You need to be an `Admin` to use this command.")
 
 
 def not_blacklisted(ctx):
-    if is_staff(ctx):
+    try:
+        return is_staff(ctx)
+    except ctx.ona.OnaError:
+        return ctx.ona_assert(ctx.channel.id not in ctx.config.blacklist,
+                              error="Commands have been disabled in this channel.")
+
+
+def not_silenced(ctx):
+    if ctx.channel.id not in ctx.config.chat_throttle:
         return True
-    return ctx.channel.id not in ctx.config.blacklist
+    ctx.ona_assert(ctx.guild, ctx.has_role(ctx.config.silenced),
+                   error="You've been silenced. Use a bot channel instead.")
+    ctx.ona_assert(ctx.guild, any(role.id == ctx.config.silenced for role in ctx.guild.me.roles),
+                   error="I'm on silent mode. Try again later!")
 
 
 # This check ignores all channels not on the image_throttle list
 async def image_throttle(ctx):
-    if ctx.message.id not in ctx.config.image_throttle or is_admin(ctx):
+    try:
+        return is_staff(ctx)
+    except ctx.ona.OnaError:
+        pass
+    if ctx.message.id not in ctx.config.image_throttle:
         return True
     # OnaError if there are too many images in the channel
     last_ten = await ctx.history(limit=10).flatten()
@@ -97,13 +114,12 @@ async def image_throttle(ctx):
 
 # This check ignores all channels not on the chat_throttle list
 async def chat_throttle(ctx):
-    if ctx.message.id not in ctx.config.chat_throttle or is_admin(ctx):
+    try:
+        return is_staff(ctx)
+    except ctx.ona.OnaError:
+        pass
+    if ctx.channel.id not in ctx.config.chat_throttle:
         return True
-    # OnaError if either the user or Ona have the Silenced role
-    ctx.ona_assert(ctx.has_role(ctx.config.silenced),
-                   error="You've been silenced. Use a bot channel instead!")
-    ctx.ona_assert(any(role.id == ctx.config.silenced for role in ctx.guild.me.roles),
-                   error="I'm on silent mode. Use a bot channel instead!")
     # OnaError if the 10th oldest message is <40 seconds old
     async for message in ctx.history(limit=10):
         oldest = message
