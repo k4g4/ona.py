@@ -1,9 +1,9 @@
 from datetime import datetime
 from discord.ext import commands
-from .ona_context import OnaContext
-from .ona_configparser import OnaConfigParser
-from .ona_helpformatter import OnaHelpFormatter
-from .ona_utils import OnaUtilsMixin, is_owner
+from .context import OnaContext
+from .configparser import OnaConfigParser
+from .helpformatter import OnaHelpFormatter
+from .utils import OnaUtilsMixin, is_owner
 
 __author__ = 'kaga'
 
