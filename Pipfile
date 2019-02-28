@@ -8,6 +8,8 @@ verify_ssl = true
 [packages]
 "discord.py" = {git = "https://github.com/Rapptz/discord.py.git",ref = "rewrite"}
 requests = "*"
+pymongo = "*"
+cachetools = "*"
 
 [requires]
 python_version = "3.6"

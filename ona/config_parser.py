@@ -15,6 +15,5 @@ class OnaConfigParser:
             value = next(self.parser[section][key] for section in self.parser if key in self.parser[section])
         except StopIteration:
             return None
-
         # the value will be converted to a python object
         return loads(value)

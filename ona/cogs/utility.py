@@ -2,14 +2,14 @@ import time
 import asyncio
 import requests
 import discord
-from datetime import datetime, timedelta
 from json import loads
+from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from discord.ext import commands
-from ona.ona_utils import in_server
+from ona.utils import in_server
 
 
-class Utility:
+class Utility(commands.Cog):
     '''These commands perform a variety of useful tasks.'''
 
     def __init__(self, ona):
@@ -36,8 +36,10 @@ class Utility:
     async def help(self, ctx, command_name: str = None):
         '''Display help for any or all of Ona's commands.'''
         if command_name:
-            command = next(cmd for cmd in self.ona.commands if command_name.lower() in [cmd.name] + cmd.aliases)
-            ctx.ona_assert(command is not None, error="That is not a valid command name.")
+            try:
+                command = next(cmd for cmd in self.ona.commands if command_name.lower() in [cmd.name] + cmd.aliases)
+            except StopIteration:
+                raise self.ona.OnaError("That is not a valid command name.")
             await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
         else:
             await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
@@ -85,7 +87,6 @@ class Utility:
 
     @commands.command(aliases=["search", "g"])
     @commands.cooldown(2, 20, commands.BucketType.user)
-    @commands.check(in_server)
     async def google(self, ctx, *query: str):
         '''Search for anything on Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
@@ -99,7 +100,6 @@ class Utility:
 
     @commands.command(aliases=["img", "image"])
     @commands.cooldown(2, 20, commands.BucketType.user)
-    @commands.check(in_server)
     async def imagesearch(self, ctx, *query: str):
         '''Search for any image using Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
@@ -127,7 +127,7 @@ class Utility:
         res = requests.get("https://osu.ppy.sh/api/get_user", params=params)
         ctx.ona_assert(res.text != "[]", error="The username/id provided is invalid.")
         osu_user = loads(res.text)[0]
-        # All stats are strings by default. Convert to python objects.
+        # All stats are provided as strings by default. Convert to python objects.
         osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in osu_user.items()}
         url = f"https://osu.ppy.sh/osu_users/{osu_user['user_id']}"
         stats = [
@@ -145,7 +145,7 @@ class Utility:
     @commands.command(aliases=["sauce"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def source(self, ctx, url: str = None):
-        '''Reverse image search any image. Either attach an image, post its url, or use the
+        '''Reverse image search any image. Either attach an image, post its url, or automatically use the
         most recently posted image in the channel.'''
         url = await handle_file_url(url)
         loop = asyncio.get_event_loop()

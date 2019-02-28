@@ -2,28 +2,34 @@ import asyncio
 import discord
 from discord.ext import commands
 
+event = commands.Cog.listener()
 
-class Events:
+
+class Events(commands.Cog):
     '''Event coroutines are kept in this class to reduce clutter.'''
 
     def __init__(self, ona):
         self.ona = ona
 
+    @event
     async def on_ready(self):
         listening = discord.ActivityType.listening
         listening_to_help = discord.Activity(type=listening, name=f"{self.ona.config.command_prefix}help")
         await self.ona.change_presence(activity=listening_to_help)
         await self.ona.log("Ona has logged in.")
 
+    @event
     async def on_message(self, message):
         if message.author.bot:
             return
 
+    @event
     async def on_message_edit(self, before, after):
         if after.author.bot:
             return
         await self.ona.process_commands(after)
 
+    @event
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
             error = error.original

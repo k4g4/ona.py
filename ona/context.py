@@ -23,10 +23,10 @@ class OnaContext(commands.Context):
             return self.ona.get(self.guild.roles, name=name)
 
     def has_role(self, role_id):
-        return any(role.id == role_id for role in ctx.author.roles)
+        return any(role.id == role_id for role in self.author.roles)
 
     def has_any_role(self, role_ids):
-        return any(role.id in role_ids for role in ctx.author.roles)
+        return any(role.id in role_ids for role in self.author.roles)
 
     async def send(self, content="", *, multi=False, filename=None, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
@@ -89,9 +89,9 @@ class OnaContext(commands.Context):
     async def embed_browser(self, embeds, pos=0):
         '''Send a list of embeds to display each one along with reaction based controls to navigate through
         them. The start parameter decides which embed should be shown first.'''
-        self.ona_assert(isinstance(self.channel, discord.TextChannel),
-                        self.channel.permissions_for(self.me).manage_messages,
-                        error="I need the `Manage Messages` permission to do that.")
+        can_remove_reacts = (isinstance(self.channel, discord.TextChannel) and
+                             self.channel.permissions_for(self.me).manage_messages)
+
         # Add page numbers to each embed
         for i, embed in enumerate(embeds, 1):
             embed.set_footer(text=f"Page {i} of {len(embeds)}")
@@ -107,13 +107,15 @@ class OnaContext(commands.Context):
                 reaction, user = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
             except asyncio.TimeoutError:
                 break
-            await message.remove_reaction(reaction.emoji, user)
+            if can_remove_reacts:
+                await message.remove_reaction(reaction.emoji, user)
             if user == self.author:
                 # increment or decrement the position according to the reaction, unless at either end of the list
                 pos += 1 if reaction.emoji == "➡" and pos < len(embeds) - 1 else 0
                 pos -= 1 if reaction.emoji == "⬅" and pos > 0 else 0
                 await message.edit(embed=embeds[pos])
-        await message.clear_reactions()
+        if can_remove_reacts:
+            await message.clear_reactions()
         return message
 
     async def clean_up(self, *messages):
@@ -133,12 +135,6 @@ class OnaContext(commands.Context):
             await self.clean_up(await self.send(f"{self.author.mention} Check your DM!"))
         return message
 
-    def ona_assert(self, *assertions, error):
-        '''Assert that all provided assertions are True. If one is False, raise an OnaError.'''
-        if not all(assertions):
-            raise self.ona.OnaError(error)
-        return True
-
     async def handle_file_url(self, url):
         '''For commands that require a file url, Ona first checks if the user attached a file.
         If no file was attached and no file url was given, Ona searches chat history for
@@ -150,3 +146,17 @@ class OnaContext(commands.Context):
         message = await self.history().find(lambda m: len(m.attachments))
         self.ona_assert(message is not None, error="No image was provided.")
         return message.attachments[0].url
+
+    def ona_assert(self, *assertions, error):
+        '''Assert that all provided assertions are True. If one is False, raise an OnaError.'''
+        if not all(assertions):
+            raise self.ona.OnaError(error)
+        return True
+
+    def check_perm(self, perm):
+        '''Assert that the user and Ona have the specified permission.'''
+        self.ona_assert(self.guild, error="You must be in a server to use this command.")
+        self.ona_assert(getattr(self.me.permissions_in(self.channel), perm),
+                        error=f"I need the `{perm.title()}` permission to do that.")
+        return self.ona_assert(getattr(self.author.permissions_in(self.channel), perm),
+                               error=f"You need the `{perm.title()}` permission to use this command.")

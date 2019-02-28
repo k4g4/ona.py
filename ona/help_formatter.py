@@ -11,23 +11,24 @@ class OnaHelpFormatter(commands.HelpFormatter):
         self.ona = ona
 
     async def format(self):
-        description = self.command.help if hasattr(self.command, "help") else self.command.__doc__
         no_desc = "*No description provided.*"
-        description = description if description else no_desc
-        embed = discord.Embed(description=description, title=self.ona.user.name, color=self.ona.config.ona_color)
+        embed = self.ona.quick_embed(title=self.ona.user.name)
         embed.set_thumbnail(url=self.ona.user.avatar_url)
         # The help page for a single command
         if isinstance(self.command, commands.Command):
-            embed.title = self.get_command_signature()
-            cooldown = self.command._buckets._cooldown
-            if cooldown:
-                embed.description += (f"\n\nThis command can be used {self.ona.plural(cooldown.rate, 'time')} " +
-                                      f"every {self.ona.plural(cooldown.per, 'second')}.")
+            embed.title = self.context.config.command_prefix + self.command.signature
+            embed.description = self.command.help if self.command.help else no_desc
+            cd = self.command._buckets._cooldown
+            if cd:
+                value = f"{self.ona.plural(cd.rate, 'time').capitalize()} every {self.ona.plural(cd.per, 'second')}."
+                embed.add_field(name="Cooldown", value=value)
             return embed
 
         # The help page for all commands
+        embed.description = self.command.__doc__
+
         def key(cmd):
-            return cmd[1].cog_name
+            return cmd[1].cog_name if cmd[1].cog_name else ""
 
         def cmd_format(name, cmd):
             return f"**{name}**: {self.shorten(cmd.help) if cmd.help else no_desc}"
@@ -36,6 +37,6 @@ class OnaHelpFormatter(commands.HelpFormatter):
             cmds = list(cmds)
             if cmds:
                 subcmds = "\n".join(cmd_format(name, cmd) for name, cmd in cmds if name not in cmd.aliases)
-                embed.add_field(name=cog, value=subcmds)
+                embed.add_field(name=cog if cog else "Other", value=subcmds)
         embed.set_footer(text=f"Use {self.ona.config.command_prefix}help [command] for details on a single command.")
         return embed

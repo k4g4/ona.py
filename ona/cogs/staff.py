@@ -1,19 +1,18 @@
+import discord
 from discord.ext import commands
-from ona.ona_utils import is_staff, is_admin, is_owner
+from ona.utils import is_owner
 
 
-class Staff:
+class Staff(commands.Cog):
     '''Helpful commands for moderation and bot maintenance.'''
 
     def __init__(self, ona):
         self.ona = ona
 
-    def cog_check(self, ctx):
-        return is_staff(ctx)
-
     @commands.command()
     async def kick(self, ctx, *members: discord.Member):
         '''Kick one or more members from the server.'''
+        ctx.check_perm("kick_members")
         ctx.ona_assert(members, error="Give one or more members to kick.")
         await ctx.message.delete()
         for member in members:
@@ -29,6 +28,7 @@ class Staff:
     @commands.command()
     async def ban(self, ctx, *members: discord.Member):
         '''Ban one or more members from the server.'''
+        ctx.check_perm("ban_members")
         ctx.ona_assert(members, error="Give one or more members to kick.")
         await ctx.message.delete()
         for member in members:
@@ -42,17 +42,18 @@ class Staff:
         await staff_logs.send(embed=self.ona.quick_embed(content, title="Staff Logs"))
 
     @commands.command(aliases=['purge'])
-    async def prune(self, ctx, count: int, member_filter: discord.Member = None):
+    async def prune(self, ctx, count: int, filter: discord.Member = None):
         '''Prune multiple messages from the channel with an optional member filter.
         If the member filter is provided, only that member's messages are removed out of the number of
         messages given.'''
-        ctx.ona_assert(count > ctx.config.max_prune,
-                       error="You can only prune up to {ctx.config.max_prune} messages at a time.")
+        ctx.check_perm("manage_messages")
+        ctx.ona_assert(count < ctx.config.max_prune,
+                       error=f"You can only prune up to {ctx.config.max_prune} messages at a time.")
         await ctx.message.delete()
-        deleted = await ctx.channel.purge(limit=count, check=lambda m: filter and m.author == filter)
-        embed = self.ona.quick_embed(f"{len(deleted)} messages were pruned.", title="Staff Logs")
+        pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
+        embed = self.ona.quick_embed(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
         await ctx.clean_up(await ctx.send(embed=embed))
-        embed.add_field(name="Channel", value=ctx.channel.mention)
+        embed.add_field(name="Channel", value=ctx.channel.mention).title = "Staff Logs"
         await ctx.guild.get_channel(ctx.config.staff_logs).send(embed=embed)
 
     @commands.command(aliases=["shutdown"])
@@ -69,6 +70,7 @@ class Staff:
     @commands.command(pass_context=True, aliases=['changeavi'])
     @commands.check(is_owner)
     async def changeavatar(self, ctx, url: str = None):
+        '''Attach an image to change Ona's avatar.'''
         with self.ona.download(await ctx.handle_file_url(url)) as filename, open(filename, 'b') as avatar:
             await self.ona.user.edit(avatar=avatar)
         await ctx.send("My avatar has been updated.")
