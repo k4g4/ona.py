@@ -3,7 +3,6 @@ import requests
 import discord
 from contextlib import contextmanager
 from datetime import timedelta, datetime
-from json import loads
 from discord.ext import commands
 
 
@@ -31,7 +30,7 @@ class OnaUtilsMixin:
         params = {"q": query, "key": self.secrets.google_key, "cx": self.secrets.google_engine_id}
         if image:
             params["searchType"] = "image"
-        return loads(requests.get("https://www.googleapis.com/customsearch/v1", params=params).text)["items"]
+        return requests.get("https://www.googleapis.com/customsearch/v1", params=params.json())["items"]
 
     @staticmethod
     def plural(value, word):

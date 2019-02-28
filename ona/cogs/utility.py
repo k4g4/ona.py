@@ -90,7 +90,7 @@ class Utility(commands.Cog):
     async def google(self, ctx, *query: str):
         '''Search for anything on Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
-        results = [(item["title"], item["link"]) for item in self.ona.search(query)]
+        results = [(result["title"], result["link"]) for result in self.ona.search(query)]
         embeds = []
         per_page = 5
         for i in range(0, len(results), per_page):
@@ -119,6 +119,19 @@ class Utility(commands.Cog):
         await ctx.send(next(item["link"] for item in self.ona.search(query) if "youtube.com/watch" in item["link"]))
 
     @commands.command()
+    @commands.cooldown(2, 20, commands.BucketType.user)
+    async def define(self, ctx, *query: str):
+        '''Find the definition for a word or phrase.'''
+        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to define:")
+        search_url = "https://od-api.oxforddictionaries.com:443/api/v1/search/en/"
+        headers = {"app_id": self.ona.secrets.oxford_id, "app_key": self.ona.secrets.oxford_key}
+        params = {"q": query, "limit": 1}
+        word_id = requests.get(search_url, headers=headers, params=params).json()["results"][0]["id"]
+        entry_url = "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/" + word_id.lower()
+        entries = requests.get(entry_url, headers=headers).json()["results"][0]["lexicalEntries"]["entries"]
+        pass
+
+    @commands.command()
     async def osu(self, ctx, *username: str):
         '''Search for an osu! profile. Provide either an osu! username or user id.'''
         username = " ".join(username) if username else await ctx.ask("Give a username to search for:")
@@ -126,7 +139,7 @@ class Utility(commands.Cog):
         params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
         res = requests.get("https://osu.ppy.sh/api/get_user", params=params)
         ctx.ona_assert(res.text != "[]", error="The username/id provided is invalid.")
-        osu_user = loads(res.text)[0]
+        osu_user = res.json()[0]
         # All stats are provided as strings by default. Convert to python objects.
         osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in osu_user.items()}
         url = f"https://osu.ppy.sh/osu_users/{osu_user['user_id']}"
