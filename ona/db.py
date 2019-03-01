@@ -1,5 +1,6 @@
 from pymongo import MongoClient, ReturnDocument
 from cachetools import LRUCache
+from contextlib import contextmanager
 
 
 class OnaDocument(dict):
@@ -22,11 +23,18 @@ class OnaDB:
     def get_doc(self, _id):
         if _id in self.doc_cache:
             return self.doc_cache[_id]
-        doc = OnaDocument(self.collection.find_one_and_update({"_id": _id}, {"$setOnInsert": {}},
+        doc = OnaDocument(self.collection.find_one_and_update({"_id": _id}, {"$setOnInsert": {"money": 0}},
                                                               upsert=True, return_document=ReturnDocument.AFTER))
         self.doc_cache[_id] = doc
         return doc
 
-    def update_doc(self, doc):
-        self.collection.replace_one({"_id": doc["_id"]}, doc)
-        self.doc_cache[doc["_id"]] = doc
+    def update_doc(self, doc):  # This method should only ever be called by doc_context
+        if not self.collection.replace_one({"_id": doc["_id"]}, doc).matched_count:
+            self.collection.insert_one({"_id": doc["_id"]})
+
+    @contextmanager
+    def doc_context(self, _id):
+        '''Incorporate get_doc and update_doc as a single contextmanager.'''
+        doc = self.get_doc(_id)
+        yield doc
+        self.update_doc(doc)

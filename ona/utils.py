@@ -18,7 +18,8 @@ class OnaUtilsMixin:
 
     def quick_embed(self, content="", *, title=None, url=None, author=None, fields=[]):
         '''An embed factory method.'''
-        embed = discord.Embed(description=content, title=title, url=url, color=self.config.ona_color)
+        embed = discord.Embed(description=str(content), title=title, url=url, color=self.config.ona_color)
+        embed.timestamp = datetime.utcnow()
         if author:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
         for field in fields:

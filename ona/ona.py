@@ -20,8 +20,8 @@ class Ona(commands.Bot, OnaUtilsMixin):
 
         super().__init__(command_prefix=self.config.command_prefix, formatter=formatter)
 
-        self.guild_db = OnaDB(self, "guilds")
-        self.user_db = OnaDB(self, "users")
+        self.guild_db = OnaDB(self, self.config.guild_db)
+        self.user_db = OnaDB(self, self.config.user_db)
 
         self.add_command(self.reload)
         self.remove_command("help")

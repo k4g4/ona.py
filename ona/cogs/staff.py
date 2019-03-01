@@ -1,4 +1,5 @@
 import discord
+from json import loads
 from discord.ext import commands
 from ona.utils import is_owner
 
@@ -10,6 +11,7 @@ class Staff(commands.Cog):
         self.ona = ona
 
     @commands.command()
+    @commands.has_permissions(kick_members=True)
     async def kick(self, ctx, *members: discord.Member):
         '''Kick one or more members from the server.'''
         ctx.check_perm("kick_members")
@@ -22,10 +24,10 @@ class Staff(commands.Cog):
         else:
             content = (f"{ctx.author.display_name} kicked multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        staff_logs = ctx.guild.get_channel(ctx.config.staff_logs)
-        await staff_logs.send(embed=self.ona.quick_embed(content, title="Staff Logs"))
+        await ctx.staff_log(content)
 
     @commands.command()
+    @commands.has_permissions(ban_members=True)
     async def ban(self, ctx, *members: discord.Member):
         '''Ban one or more members from the server.'''
         ctx.check_perm("ban_members")
@@ -38,10 +40,10 @@ class Staff(commands.Cog):
         else:
             content = (f"{ctx.author.display_name} banned multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        staff_logs = ctx.guild.get_channel(ctx.config.staff_logs)
-        await staff_logs.send(embed=self.ona.quick_embed(content, title="Staff Logs"))
+        await ctx.staff_log(content)
 
     @commands.command(aliases=['purge'])
+    @commands.has_permissions(manage_messages=True)
     async def prune(self, ctx, count: int, filter: discord.Member = None):
         '''Prune multiple messages from the channel with an optional member filter.
         If the member filter is provided, only that member's messages are removed out of the number of
@@ -49,12 +51,22 @@ class Staff(commands.Cog):
         ctx.check_perm("manage_messages")
         ctx.ona_assert(count < ctx.config.max_prune,
                        error=f"You can only prune up to {ctx.config.max_prune} messages at a time.")
-        await ctx.message.delete()
+        ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
-        embed = self.ona.quick_embed(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
-        await ctx.clean_up(await ctx.send(embed=embed))
-        embed.add_field(name="Channel", value=ctx.channel.mention).title = "Staff Logs"
-        await ctx.guild.get_channel(ctx.config.staff_logs).send(embed=embed)
+        await ctx.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def editsetting(self, ctx, setting: str = None):
+        setting = setting if setting else await ctx.ask("Which setting would you like to edit?")
+        with ctx.guild_doc_context() as guild_doc:
+            content = f"Give the new value for `{setting}`:"
+            if setting in guild_doc:
+                content = f"`{setting}` is currently set to `{guild_doc[setting]}`. {content}"
+            new_setting = await ctx.ask(content)
+            print(new_setting)
+            guild_doc[setting] = loads(new_setting)
+        await ctx.staff_log(f"`{setting}` is now set to `{ctx.guild_doc[setting]}`.")
 
     @commands.command(aliases=["shutdown"])
     @commands.check(is_owner)
@@ -67,9 +79,9 @@ class Staff(commands.Cog):
         else:
             await ctx.send("Shutdown aborted.")
 
-    @commands.command(pass_context=True, aliases=['changeavi'])
+    @commands.command(pass_context=True, aliases=['editavi'])
     @commands.check(is_owner)
-    async def changeavatar(self, ctx, url: str = None):
+    async def editavatar(self, ctx, url: str = None):
         '''Attach an image to change Ona's avatar.'''
         with self.ona.download(await ctx.handle_file_url(url)) as filename, open(filename, 'b') as avatar:
             await self.ona.user.edit(avatar=avatar)
@@ -77,12 +89,21 @@ class Staff(commands.Cog):
 
     @commands.command()
     @commands.check(is_owner)
-    async def eval(self, ctx, *expression: str):
+    async def eval(self, ctx, *, expression: str):
         '''Evaluate any Python expression.'''
         try:
-            await ctx.send(eval(" ".join(expression)))
+            await ctx.send(eval(expression))
         except Exception as e:
             raise self.ona.OnaError(f"Error during eval: {e}")
+
+    @commands.command()
+    @commands.check(is_owner)
+    async def hack(self, ctx, member: discord.Member, money: int):
+        '''Give or remove money from a user.'''
+        with ctx.member_doc_context(member) as member_doc:
+            member_doc.money += money
+        await ctx.staff_log((f"{member.display_name} {'gained' if money >= 0 else 'lost'} "
+                             f"{money} {ctx.guild_doc.currency}."))
 
 
 def setup(ona):

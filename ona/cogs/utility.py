@@ -51,14 +51,14 @@ class Utility(commands.Cog):
         await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {self.ona.get_emoji(ctx.config.hearteyes)}")
 
     @commands.command(aliases=["avi", "pfp"])
-    async def avatar(self, ctx, *, member: discord.Member = None):
+    async def avatar(self, ctx, member: discord.Member = None):
         '''Display a user's avatar.'''
         member = member if member else ctx.author
         with self.ona.download(member.avatar_url_as(static_format="png", size=256)) as avatar_file:
             await ctx.send(f"{member.display_name}'s avatar:", file=discord.File(avatar_file))
 
     @commands.command(aliases=["emoji", "e"])
-    async def emote(self, ctx, *, emoji: discord.Emoji):
+    async def emote(self, ctx, emoji: discord.Emoji):
         '''Get a fullsize image for an emote. Only works for emotes in servers Ona shares.'''
         with self.ona.download(emoji.url) as emoji_file:
             await ctx.send(file=discord.File(emoji_file))
@@ -87,9 +87,9 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["search", "g"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def google(self, ctx, *query: str):
+    async def google(self, ctx, *, query: str):
         '''Search for anything on Google.'''
-        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
+        query = query if query else await ctx.ask("Give a word or phrase to search:")
         fields = [(result["title"], result["link"]) for result in self.ona.search(query)]
         embeds = []
         per_page = 5
@@ -100,9 +100,9 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["img", "image"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def imagesearch(self, ctx, *query: str):
+    async def imagesearch(self, ctx, *, query: str):
         '''Search for any image using Google.'''
-        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
+        query = query if query else await ctx.ask("Give a word or phrase to search:")
         results = self.ona.search(query, image=True)
 
         embeds = []
@@ -113,24 +113,23 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["yt"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def youtube(self, ctx, *query: str):
+    async def youtube(self, ctx, *, query: str):
         '''Search for a video on YouTube.'''
-        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
+        query = query if query else await ctx.ask("Give a word or phrase to search:")
         query = f"youtube {query}"
         await ctx.send(next(item["link"] for item in self.ona.search(query) if "youtube.com/watch" in item["link"]))
 
     @commands.command()
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def define(self, ctx, *query: str):
+    async def define(self, ctx, *, query: str):
         '''Find the definition for a word or phrase.'''
-        query = " ".join(query) if query else await ctx.ask("Give a word or phrase to define:")
+        query = query if query else await ctx.ask("Give a word or phrase to define:")
         search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
         headers = {"app_id": self.ona.secrets.oxford_id, "app_key": self.ona.secrets.oxford_key}
         params = {"q": query, "limit": 1}
         results = requests.get(search_url, headers=headers, params=params).json()["results"]
         ctx.ona_assert(len(results), error=f"'{query}' is not an English word.")
-        word_id = results[0]["id"]
-        entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + word_id.lower()
+        entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + results[0]["id"].lower()
         lex_entries = requests.get(entry_url, headers=headers).json()["results"][0]["lexicalEntries"]
 
         def combine_defs(lex_entry):    # flatten each lexical entry into a list of definitions
@@ -145,9 +144,9 @@ class Utility(commands.Cog):
         await ctx.embed_browser(embeds)
 
     @commands.command()
-    async def osu(self, ctx, *username: str):
+    async def osu(self, ctx, *, username: str):
         '''Search for an osu! profile. Provide either an osu! username or user id.'''
-        username = " ".join(username) if username else await ctx.ask("Give a username to search for:")
+        username = username if username else await ctx.ask("Give a username to search for:")
         mode = await ctx.ask("Choose a gamemode:", ["Standard", "Taiko", "Catch the Beat", "Mania"])
         params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
         res = requests.get("https://osu.ppy.sh/api/get_user", params=params)

@@ -1,6 +1,7 @@
 import asyncio
 import discord
 from discord.ext import commands
+from .utils import in_server
 
 char_limit = 2000
 
@@ -14,8 +15,26 @@ class OnaContext(commands.Context):
 
     @property
     def config(self):
-        # TODO: make the config vary based on which server the ctx is in, if attribute is not in db then raise error
         return self.bot.config
+
+    # These doc properties are for reading purposes only. Use the doc_context methods for writing edits.
+    @property
+    def guild_doc(self):
+        return self.ona.guild_db.get_doc(self.guild.id)
+
+    @property
+    def author_doc(self):
+        return self.ona.user_db.get_doc(self.author.id)
+
+    # These context managers yield OnaDocument objects, and changes to the objects update the db on exit.
+    def guild_doc_context(self):
+        return self.ona.guild_db.doc_context(self.guild.id)
+
+    def author_doc_context(self):
+        return self.ona.user_db.doc_context(self.author.id)
+
+    def member_doc_context(self, member):
+        return self.ona.user_db.doc_context(member.id)
 
     def get_role_named(self, name):
         '''Return a role in the context's guild if it exists, otherwise None.'''
@@ -78,10 +97,9 @@ class OnaContext(commands.Context):
             response = await self.ona.wait_for("message", timeout=timeout, check=check)
         except asyncio.TimeoutError:
             raise self.ona.OnaError("You took too long to respond.")
-        finally:
-            if isinstance(self.channel, discord.TextChannel):
-                if self.channel.permissions_for(self.me).manage_messages:
-                    await self.channel.delete_messages([message, response])
+        if isinstance(self.channel, discord.TextChannel):
+            if self.channel.permissions_for(self.me).manage_messages:
+                await self.channel.delete_messages([message, response])
         if options:
             return int(response.content) - 1    # The returned value is an index of the options list
         return response.content     # No options were provided
@@ -135,6 +153,12 @@ class OnaContext(commands.Context):
             await self.clean_up(await self.send(f"{self.author.mention} Check your DM!"))
         return message
 
+    async def staff_log(self, content):
+        fields = [("Channel", self.channel.mention)]
+        embed = self.ona.quick_embed(content, title="Staff Logs", author=self.author, fields=fields)
+        await self.clean_up(await self.send(embed=embed))
+        await self.guild.get_channel(self.guild_doc.staff_logs).send(embed=embed)
+
     async def handle_file_url(self, url):
         '''For commands that require a file url, Ona first checks if the user attached a file.
         If no file was attached and no file url was given, Ona searches chat history for
@@ -154,9 +178,7 @@ class OnaContext(commands.Context):
         return True
 
     def check_perm(self, perm):
-        '''Assert that the user and Ona have the specified permission.'''
-        self.ona_assert(self.guild, error="You must be in a server to use this command.")
+        '''Assert that Ona has the specified permission.'''
+        in_server(self)
         self.ona_assert(getattr(self.me.permissions_in(self.channel), perm),
                         error=f"I need the `{perm.title()}` permission to do that.")
-        return self.ona_assert(getattr(self.author.permissions_in(self.channel), perm),
-                               error=f"You need the `{perm.title()}` permission to use this command.")
