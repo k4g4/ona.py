@@ -88,7 +88,7 @@ class OnaContext(commands.Context):
 
     async def embed_browser(self, embeds, pos=0):
         '''Send a list of embeds to display each one along with reaction based controls to navigate through
-        them. The start parameter decides which embed should be shown first.'''
+        them. The pos parameter decides which embed should be shown first.'''
         can_remove_reacts = (isinstance(self.channel, discord.TextChannel) and
                              self.channel.permissions_for(self.me).manage_messages)
 

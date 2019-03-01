@@ -80,7 +80,7 @@ class Staff(commands.Cog):
     async def eval(self, ctx, *expression: str):
         '''Evaluate any Python expression.'''
         try:
-            await ctx.send(str(eval(" ".join(expression))))
+            await ctx.send(eval(" ".join(expression)))
         except Exception as e:
             raise self.ona.OnaError(f"Error during eval: {e}")
 

@@ -86,24 +86,25 @@ class Utility(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(aliases=["search", "g"])
-    @commands.cooldown(2, 20, commands.BucketType.user)
+    @commands.cooldown(2, 15, commands.BucketType.user)
     async def google(self, ctx, *query: str):
         '''Search for anything on Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
-        results = [(result["title"], result["link"]) for result in self.ona.search(query)]
+        fields = [(result["title"], result["link"]) for result in self.ona.search(query)]
         embeds = []
         per_page = 5
-        for i in range(0, len(results), per_page):
-            embed = self.ona.quick_embed(title="Search Results", author=ctx.author, fields=results[i:i+per_page])
+        for i in range(0, len(fields), per_page):
+            embed = self.ona.quick_embed(title="Search Results", author=ctx.author, fields=fields[i:i+per_page])
             embeds.append(embed.set_thumbnail(url="https://i.imgur.com/oRN5hP2.png"))
         await ctx.embed_browser(embeds)
 
     @commands.command(aliases=["img", "image"])
-    @commands.cooldown(2, 20, commands.BucketType.user)
+    @commands.cooldown(2, 15, commands.BucketType.user)
     async def imagesearch(self, ctx, *query: str):
         '''Search for any image using Google.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
         results = self.ona.search(query, image=True)
+
         embeds = []
         for result in results:
             embed = self.ona.quick_embed(result["title"], title="Search Results", author=ctx.author)
@@ -111,7 +112,7 @@ class Utility(commands.Cog):
         await ctx.embed_browser(embeds)
 
     @commands.command(aliases=["yt"])
-    @commands.cooldown(2, 20, commands.BucketType.user)
+    @commands.cooldown(2, 15, commands.BucketType.user)
     async def youtube(self, ctx, *query: str):
         '''Search for a video on YouTube.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to search:")
@@ -119,17 +120,29 @@ class Utility(commands.Cog):
         await ctx.send(next(item["link"] for item in self.ona.search(query) if "youtube.com/watch" in item["link"]))
 
     @commands.command()
-    @commands.cooldown(2, 20, commands.BucketType.user)
+    @commands.cooldown(2, 15, commands.BucketType.user)
     async def define(self, ctx, *query: str):
         '''Find the definition for a word or phrase.'''
         query = " ".join(query) if query else await ctx.ask("Give a word or phrase to define:")
-        search_url = "https://od-api.oxforddictionaries.com:443/api/v1/search/en/"
+        search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
         headers = {"app_id": self.ona.secrets.oxford_id, "app_key": self.ona.secrets.oxford_key}
         params = {"q": query, "limit": 1}
-        word_id = requests.get(search_url, headers=headers, params=params).json()["results"][0]["id"]
-        entry_url = "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/" + word_id.lower()
-        entries = requests.get(entry_url, headers=headers).json()["results"][0]["lexicalEntries"]["entries"]
-        pass
+        results = requests.get(search_url, headers=headers, params=params).json()["results"]
+        ctx.ona_assert(len(results), error=f"'{query}' is not an English word.")
+        word_id = results[0]["id"]
+        entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + word_id.lower()
+        lex_entries = requests.get(entry_url, headers=headers).json()["results"][0]["lexicalEntries"]
+
+        def combine_defs(lex_entry):    # flatten each lexical entry into a list of definitions
+            senses = (sense for entry in lex_entry["entries"] for sense in entry["senses"] if "definitions" in sense)
+            return [(sense.get("domains", ["Misc"])[0], sense["definitions"][0].capitalize()) for sense in senses]
+
+        pages = [(lex_entry["lexicalCategory"], combine_defs(lex_entry)) for lex_entry in lex_entries]
+        embeds = []
+        for page in pages:
+            embed = self.ona.quick_embed(title=f"{query.title()} - {page[0]}", author=ctx.author, fields=page[1])
+            embeds.append(embed.set_thumbnail(url="https://i.imgur.com/hd60hLe.png"))
+        await ctx.embed_browser(embeds)
 
     @commands.command()
     async def osu(self, ctx, *username: str):

@@ -30,7 +30,7 @@ class OnaUtilsMixin:
         params = {"q": query, "key": self.secrets.google_key, "cx": self.secrets.google_engine_id}
         if image:
             params["searchType"] = "image"
-        return requests.get("https://www.googleapis.com/customsearch/v1", params=params.json())["items"]
+        return requests.get("https://www.googleapis.com/customsearch/v1", params=params).json()["items"]
 
     @staticmethod
     def plural(value, word):
