@@ -96,7 +96,7 @@ class Staff(commands.Cog):
         '''Attach an image to change Ona's avatar.'''
         with self.ona.download(await ctx.handle_file_url(url)) as filename, open(filename, 'b') as avatar:
             await self.ona.user.edit(avatar=avatar)
-        await ctx.send("My avatar has been updated.")
+        await ctx.clean_up(await ctx.send("My avatar has been updated."))
 
     @commands.command()
     @commands.check(is_owner)
@@ -113,8 +113,8 @@ class Staff(commands.Cog):
         '''Give or remove money from a user.'''
         with ctx.member_doc_ctx(member) as member_doc:
             member_doc.money += money
-        await self.ona.staff_log(ctx.guild, (f"{member.display_name} {'gained' if money >= 0 else 'lost'} "
-                                             f"{money} {ctx.guild_doc.currency}."), staff=True)
+        content = f"{member.display_name} {'gained' if money >= 0 else 'lost'} {money} {ctx.guild_doc.currency}."
+        await self.ona.log(ctx.guild, content, staff=True)
 
 
 def setup(ona):
