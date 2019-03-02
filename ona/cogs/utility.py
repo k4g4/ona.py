@@ -6,7 +6,7 @@ from json import loads
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from discord.ext import commands
-from ona.utils import in_server
+from ona.utils import in_guild
 
 
 class Utility(commands.Cog):
@@ -45,10 +45,10 @@ class Utility(commands.Cog):
             await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
 
     @commands.command()
-    @commands.check(in_server)
+    @commands.check(in_guild)
     async def members(self, ctx):
         '''See how many members are in the server.'''
-        await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {self.ona.get_emoji(ctx.config.hearteyes)}")
+        await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {self.ona.config.heart_eyes}")
 
     @commands.command(aliases=["avi", "pfp"])
     async def avatar(self, ctx, member: discord.Member = None):
@@ -71,7 +71,7 @@ class Utility(commands.Cog):
             roles = f"**Roles:** {', '.join(role.name for role in member.roles[1:][::-1])}"
         else:
             roles = ""
-        color = member.color if member.color.value else ctx.config.ona_color
+        color = member.color if member.color.value else self.ona.config.ona_color
         embed = discord.Embed(title=member.display_name, description=roles, color=color)
         embed.set_thumbnail(url=member.avatar_url)
         embed.add_field(name="Global Name", value=member.name).add_field(name="ID", value=member.id)
@@ -149,11 +149,11 @@ class Utility(commands.Cog):
         username = username if username else await ctx.ask("Give a username to search for:")
         mode = await ctx.ask("Choose a gamemode:", ["Standard", "Taiko", "Catch the Beat", "Mania"])
         params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
-        res = requests.get("https://osu.ppy.sh/api/get_user", params=params)
-        ctx.ona_assert(res.text != "[]", error="The username/id provided is invalid.")
-        osu_user = res.json()[0]
+        result = requests.get("https://osu.ppy.sh/api/get_user", params=params).json()
+        ctx.ona_assert(res.text != [], error="The username/id provided is invalid.")
+
         # All stats are provided as strings by default. Convert to python objects.
-        osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in osu_user.items()}
+        osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in result[0].items()}
         url = f"https://osu.ppy.sh/osu_users/{osu_user['user_id']}"
         stats = [
             ("Rank", f"{osu_user['pp_rank']:,} ({osu_user['pp_country_rank']:,} {osu_user['country']})"),

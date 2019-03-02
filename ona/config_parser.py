@@ -17,3 +17,6 @@ class OnaConfigParser:
             return None
         # the value will be converted to a python object
         return loads(value)
+
+    def to_dict(self):
+        return {k: loads(v) for section in self.parser.values() for k, v in section.items()}

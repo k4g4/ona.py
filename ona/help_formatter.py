@@ -16,7 +16,7 @@ class OnaHelpFormatter(commands.HelpFormatter):
         embed.set_thumbnail(url=self.ona.user.avatar_url)
         # The help page for a single command
         if isinstance(self.command, commands.Command):
-            embed.title = self.context.config.command_prefix + self.command.signature
+            embed.title = self.context.guild_doc.prefix + self.command.signature
             embed.description = self.command.help if self.command.help else no_desc
             cd = self.command._buckets._cooldown
             if cd:
@@ -38,5 +38,5 @@ class OnaHelpFormatter(commands.HelpFormatter):
             if cmds:
                 subcmds = "\n".join(cmd_format(name, cmd) for name, cmd in cmds if name not in cmd.aliases)
                 embed.add_field(name=cog if cog else "Other", value=subcmds)
-        embed.set_footer(text=f"Use {self.ona.config.command_prefix}help [command] for details on a single command.")
+        embed.set_footer(text=f"Use {self.context.guild_doc.prefix}help [command] for details on any command.")
         return embed

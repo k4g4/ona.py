@@ -14,18 +14,23 @@ class OnaDocument(dict):
 class OnaDB:
     '''Database interactions are handled here.'''
 
-    def __init__(self, ona, collection):
+    def __init__(self, ona, collection, template):
         self.ona = ona
         self.client = MongoClient(self.ona.secrets.host, self.ona.secrets.port)
         self.collection = self.client.ona[collection]
+        self.template = template
         self.doc_cache = LRUCache(self.ona.config.max_db_cache)
 
     def get_doc(self, _id):
         if _id in self.doc_cache:
-            return self.doc_cache[_id]
-        doc = OnaDocument(self.collection.find_one_and_update({"_id": _id}, {"$setOnInsert": {"money": 0}},
-                                                              upsert=True, return_document=ReturnDocument.AFTER))
-        self.doc_cache[_id] = doc
+            doc = self.doc_cache[_id]
+        else:
+            doc = OnaDocument(self.collection.find_one_and_update({"_id": _id}, {"$setOnInsert": self.template},
+                                                                  upsert=True, return_document=ReturnDocument.AFTER))
+            self.doc_cache[_id] = doc
+        if not doc.keys() > self.template.keys():   # Basically, "the doc does not have every key in the template"
+            [doc.setdefault(key, self.template[key]) for key in self.template]    # Fill up missing keys
+            self.update_doc(doc)
         return doc
 
     def update_doc(self, doc):  # This method should only ever be called by doc_context

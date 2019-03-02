@@ -1,7 +1,7 @@
 import asyncio
 import discord
 from discord.ext import commands
-from .utils import in_server
+from .utils import in_guild
 
 char_limit = 2000
 
@@ -13,14 +13,10 @@ class OnaContext(commands.Context):
     def ona(self):
         return self.bot
 
-    @property
-    def config(self):
-        return self.bot.config
-
     # These doc properties are for reading purposes only. Use the doc_context methods for writing edits.
     @property
     def guild_doc(self):
-        return self.ona.guild_db.get_doc(self.guild.id)
+        return self.ona.guild_db.get_doc(self.guild.id if self.guild else 0)
 
     @property
     def author_doc(self):
@@ -28,7 +24,7 @@ class OnaContext(commands.Context):
 
     # These context managers yield OnaDocument objects, and changes to the objects update the db on exit.
     def guild_doc_context(self):
-        return self.ona.guild_db.doc_context(self.guild.id)
+        return self.ona.guild_db.doc_context(self.guild.id if self.guild else 0)
 
     def author_doc_context(self):
         return self.ona.user_db.doc_context(self.author.id)
@@ -66,8 +62,9 @@ class OnaContext(commands.Context):
 
         def check(r, u):
             return r.message.id == message.id and u == self.author and r.emoji in "✅❌"
+
         try:
-            timeout = self.config.response_timeout
+            timeout = self.ona.config.response_timeout
             reaction, _ = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
         except asyncio.TimeoutError:
             raise self.ona.OnaError("You took too long to react with ✅ or ❌.")
@@ -92,8 +89,9 @@ class OnaContext(commands.Context):
             if m.author != self.author:
                 return False
             return not options or m.content.isdigit() and int(m.content) <= len(options)
+
         try:
-            timeout = self.config.response_timeout
+            timeout = self.ona.config.response_timeout
             response = await self.ona.wait_for("message", timeout=timeout, check=check)
         except asyncio.TimeoutError:
             raise self.ona.OnaError("You took too long to respond.")
@@ -119,9 +117,10 @@ class OnaContext(commands.Context):
 
         def check(r, u):
             return r.message.id == message.id and not u.bot and r.emoji in "⬅➡"
+
         while True:
             try:
-                timeout = self.config.response_timeout
+                timeout = self.ona.config.response_timeout
                 reaction, user = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
             except asyncio.TimeoutError:
                 break
@@ -143,7 +142,7 @@ class OnaContext(commands.Context):
             return
         if self.channel.permissions_for(self.me).manage_messages:
             messages += (self.message,)
-        await asyncio.sleep(self.config.delete_timer)
+        await asyncio.sleep(self.ona.config.delete_timer)
         await self.channel.delete_messages(messages)
 
     async def whisper(self, *args, **kwargs):
@@ -157,7 +156,10 @@ class OnaContext(commands.Context):
         fields = [("Channel", self.channel.mention)]
         embed = self.ona.quick_embed(content, title="Staff Logs", author=self.author, fields=fields)
         await self.clean_up(await self.send(embed=embed))
-        await self.guild.get_channel(self.guild_doc.staff_logs).send(embed=embed)
+        try:
+            await self.guild.get_channel(self.guild_doc.staff_logs).send(embed=embed)
+        except AttributeError:
+            pass
 
     async def handle_file_url(self, url):
         '''For commands that require a file url, Ona first checks if the user attached a file.
@@ -179,6 +181,6 @@ class OnaContext(commands.Context):
 
     def check_perm(self, perm):
         '''Assert that Ona has the specified permission.'''
-        in_server(self)
+        in_guild(self)
         self.ona_assert(getattr(self.me.permissions_in(self.channel), perm),
                         error=f"I need the `{perm.title()}` permission to do that.")

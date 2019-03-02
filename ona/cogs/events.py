@@ -14,9 +14,9 @@ class Events(commands.Cog):
     @event
     async def on_ready(self):
         listening = discord.ActivityType.listening
-        listening_to_help = discord.Activity(type=listening, name=f"{self.ona.config.command_prefix}help")
+        listening_to_help = discord.Activity(type=listening, name=f"{self.ona.guild_db.get_doc(0).prefix}help")
         await self.ona.change_presence(activity=listening_to_help)
-        await self.ona.log("Ona has logged in.")
+        await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), "Ona has logged in.")
 
     @event
     async def on_message(self, message):
@@ -37,15 +37,18 @@ class Events(commands.Cog):
             cooldown = round(error.retry_after) + 1
             error_text = f"This command is on cooldown for {self.ona.plural(cooldown, 'second')}."
         elif isinstance(error, commands.MissingPermissions):
-            error_text = f"You need the {error.missing_perms[0].title()} permission."
+            if ctx.guild:
+                error_text = f"You need the `{error.missing_perms[0].title()}` permission."
+            else:
+                error_text = "You need to be in a server to use this command."
         elif isinstance(error, commands.CheckFailure):
             error_text = "You don't have permission to do that!"
         elif isinstance(error, self.ona.OnaError):
             error_text = str(error)
         else:
-            await self.ona.log(f"Error: {error}")
+            await self.ona.log(self.ona.config.main_guild, f"Error: {error}")
             return
-        await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.get_emoji(ctx.config.error)}"))
+        await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))
 
 
 def setup(ona):

@@ -14,14 +14,15 @@ class Ona(commands.Bot, OnaUtilsMixin):
 
     def __init__(self):
         self.uptime = datetime.utcnow()
-        self.config = OnaConfigParser("config.ini")
-        self.secrets = OnaConfigParser("secrets.ini")
+        config_files = ["config.ini", "secrets.ini", "guild.ini", "user.ini"]
+        self.config, self.secrets, guild_template, user_template = map(OnaConfigParser, config_files)
+        self.guild_db = OnaDB(self, self.config.guild_db, guild_template.to_dict())
+        self.user_db = OnaDB(self, self.config.user_db, user_template.to_dict())
         formatter = OnaHelpFormatter(self, width=self.config.help_width)
 
-        super().__init__(command_prefix=self.config.command_prefix, formatter=formatter)
-
-        self.guild_db = OnaDB(self, self.config.guild_db)
-        self.user_db = OnaDB(self, self.config.user_db)
+        def get_prefix(ona, message):
+            return ona.guild_db.get_doc(message.guild.id if message.guild else 0).prefix
+        super().__init__(command_prefix=get_prefix, formatter=formatter)
 
         self.add_command(self.reload)
         self.remove_command("help")
@@ -35,14 +36,17 @@ class Ona(commands.Bot, OnaUtilsMixin):
                 print(e)
 
     async def process_commands(self, message):
-        ctx = await self.get_context(message, cls=OnaContext)
-        await self.invoke(ctx)
+        await self.invoke(await self.get_context(message, cls=OnaContext))
 
     @commands.command()
     @commands.check(is_owner)
     async def reload(ctx):
         '''Update code for all commands, reload config settings, and refresh all cooldowns.'''
-        ctx.ona.config = OnaConfigParser("config.ini")
+        config_files = ["config.ini", "secrets.ini", "guild.ini", "user.ini"]
+        ctx.ona.config, ctx.ona.secrets, guild_template, user_template = map(OnaConfigParser, config_files)
+        ctx.ona.guild_db = OnaDB(ctx.ona, ctx.ona.config.guild_db, guild_template.to_dict())
+        ctx.ona.user_db = OnaDB(ctx.ona, ctx.ona.config.user_db, user_template.to_dict())
+
         try:
             for cog in ctx.ona.config.cogs:
                 ctx.ona.unload_extension(cog)

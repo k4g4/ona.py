@@ -1,5 +1,5 @@
 import discord
-from json import loads
+from json import loads, JSONDecodeError
 from discord.ext import commands
 from ona.utils import is_owner
 
@@ -49,23 +49,34 @@ class Staff(commands.Cog):
         If the member filter is provided, only that member's messages are removed out of the number of
         messages given.'''
         ctx.check_perm("manage_messages")
-        ctx.ona_assert(count < ctx.config.max_prune,
-                       error=f"You can only prune up to {ctx.config.max_prune} messages at a time.")
+        ctx.ona_assert(count < ctx.guild_doc.max_prune,
+                       error=f"You can only prune up to {ctx.guild_doc.max_prune} messages at a time.")
         ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
         await ctx.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def editsetting(self, ctx, setting: str = None):
+    async def settings(self, ctx):
+        '''View all available server settings.'''
+        await ctx.whisper("\n".join(self.ona.guild_db.template.keys()))
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def editsetting(self, ctx, setting: str = None, value: str = None):
+        '''Change any settings on a server. For a full list of settings, use the `settings` command.'''
         setting = setting if setting else await ctx.ask("Which setting would you like to edit?")
+        ctx.ona_assert(setting in self.ona.guild_db.template,
+                       error="That isn't a valid setting. Use `{ctx.guild_doc.prefix}settings` to see all settings.")
         with ctx.guild_doc_context() as guild_doc:
             content = f"Give the new value for `{setting}`:"
             if setting in guild_doc:
                 content = f"`{setting}` is currently set to `{guild_doc[setting]}`. {content}"
-            new_setting = await ctx.ask(content)
-            print(new_setting)
-            guild_doc[setting] = loads(new_setting)
+            new_setting = value if value else await ctx.ask(content)
+            try:
+                guild_doc[setting] = loads(new_setting)
+            except JSONDecodeError:
+                guild_doc[setting] = new_setting
         await ctx.staff_log(f"`{setting}` is now set to `{ctx.guild_doc[setting]}`.")
 
     @commands.command(aliases=["shutdown"])
