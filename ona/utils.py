@@ -16,10 +16,11 @@ class OnaUtilsMixin:
     def get(self, iterable, **attrs):
         return discord.utils.get(iterable, **attrs)
 
-    def quick_embed(self, content="", *, title=None, url=None, author=None, fields=[]):
+    def quick_embed(self, content="", *, title=None, timestamp=False, url=None, author=None, fields=[]):
         '''An embed factory method.'''
         embed = discord.Embed(description=str(content), title=title, url=url, color=self.config.ona_color)
-        embed.timestamp = datetime.utcnow()
+        if timestamp:
+            embed.timestamp = datetime.utcnow()
         if author:
             embed.set_author(name=author.display_name, icon_url=author.avatar_url)
         for field in fields:
@@ -35,9 +36,17 @@ class OnaUtilsMixin:
 
     async def log(self, guild, content):
         print(content)
-        embed = self.quick_embed(content, title="OnaLogger")
+        embed = self.quick_embed(content, title="Ona Logger", timestamp=True)
         try:
             await guild.get_channel(self.guild_db.get_doc(guild.id).logs).send(embed=embed)
+        except AttributeError:
+            pass
+
+    async def staff_log(self, guild, content):
+        fields = [("Channel", self.channel.mention)]
+        embed = self.ona.quick_embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
+        try:
+            await guild.get_channel(self.guild_db.get_doc(guild.id).staff_logs).send(embed=embed)
         except AttributeError:
             pass
 

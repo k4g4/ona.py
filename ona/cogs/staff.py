@@ -24,7 +24,7 @@ class Staff(commands.Cog):
         else:
             content = (f"{ctx.author.display_name} kicked multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        await ctx.staff_log(content)
+        await self.ona.staff_log(ctx.guild, content)
 
     @commands.command()
     @commands.has_permissions(ban_members=True)
@@ -40,7 +40,7 @@ class Staff(commands.Cog):
         else:
             content = (f"{ctx.author.display_name} banned multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        await ctx.staff_log(content)
+        await self.ona.staff_log(ctx.guild, content)
 
     @commands.command(aliases=['purge'])
     @commands.has_permissions(manage_messages=True)
@@ -53,13 +53,13 @@ class Staff(commands.Cog):
                        error=f"You can only prune up to {ctx.guild_doc.max_prune} messages at a time.")
         ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
-        await ctx.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
+        await self.ona.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
 
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def settings(self, ctx):
         '''View all available server settings.'''
-        await ctx.whisper("\n".join(self.ona.guild_db.template.keys()))
+        await ctx.whisper(embed=self.ona.quick_embed("\n".join(self.ona.guild_db.template.keys()), title="Settings"))
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -68,7 +68,7 @@ class Staff(commands.Cog):
         setting = setting if setting else await ctx.ask("Which setting would you like to edit?")
         ctx.ona_assert(setting in self.ona.guild_db.template,
                        error="That isn't a valid setting. Use `{ctx.guild_doc.prefix}settings` to see all settings.")
-        with ctx.guild_doc_context() as guild_doc:
+        with ctx.guild_doc_ctx() as guild_doc:
             content = f"Give the new value for `{setting}`:"
             if setting in guild_doc:
                 content = f"`{setting}` is currently set to `{guild_doc[setting]}`. {content}"
@@ -111,7 +111,7 @@ class Staff(commands.Cog):
     @commands.check(is_owner)
     async def hack(self, ctx, member: discord.Member, money: int):
         '''Give or remove money from a user.'''
-        with ctx.member_doc_context(member) as member_doc:
+        with ctx.member_doc_ctx(member) as member_doc:
             member_doc.money += money
         await ctx.staff_log((f"{member.display_name} {'gained' if money >= 0 else 'lost'} "
                              f"{money} {ctx.guild_doc.currency}."))

@@ -11,11 +11,11 @@ class OnaConfigParser:
 
     def __getattr__(self, key):
         try:
-            # search all sections for the key, return None if not found
+            # Search all sections for the key, return None if not found
             value = next(self.parser[section][key] for section in self.parser if key in self.parser[section])
         except StopIteration:
             return None
-        # the value will be converted to a python object
+        # The value will be converted to a python object
         return loads(value)
 
     def to_dict(self):

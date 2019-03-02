@@ -20,7 +20,7 @@ class Ona(commands.Bot, OnaUtilsMixin):
         self.user_db = OnaDB(self, self.config.user_db, user_template.to_dict())
         formatter = OnaHelpFormatter(self, width=self.config.help_width)
 
-        def get_prefix(ona, message):
+        def get_prefix(ona, message):   # The prefix is chosen depending on the server's settings
             return ona.guild_db.get_doc(message.guild.id if message.guild else 0).prefix
         super().__init__(command_prefix=get_prefix, formatter=formatter)
 

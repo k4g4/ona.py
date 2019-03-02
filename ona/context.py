@@ -23,13 +23,13 @@ class OnaContext(commands.Context):
         return self.ona.user_db.get_doc(self.author.id)
 
     # These context managers yield OnaDocument objects, and changes to the objects update the db on exit.
-    def guild_doc_context(self):
+    def guild_doc_ctx(self):
         return self.ona.guild_db.doc_context(self.guild.id if self.guild else 0)
 
-    def author_doc_context(self):
+    def author_doc_ctx(self):
         return self.ona.user_db.doc_context(self.author.id)
 
-    def member_doc_context(self, member):
+    def member_doc_ctx(self, member):
         return self.ona.user_db.doc_context(member.id)
 
     def get_role_named(self, name):
@@ -127,7 +127,7 @@ class OnaContext(commands.Context):
             if can_remove_reacts:
                 await message.remove_reaction(reaction.emoji, user)
             if user == self.author:
-                # increment or decrement the position according to the reaction, unless at either end of the list
+                # Increment or decrement the position according to the reaction, unless at either end of the list
                 pos += 1 if reaction.emoji == "➡" and pos < len(embeds) - 1 else 0
                 pos -= 1 if reaction.emoji == "⬅" and pos > 0 else 0
                 await message.edit(embed=embeds[pos])
@@ -151,15 +151,6 @@ class OnaContext(commands.Context):
         if isinstance(self.channel, discord.TextChannel):
             await self.clean_up(await self.send(f"{self.author.mention} Check your DM!"))
         return message
-
-    async def staff_log(self, content):
-        fields = [("Channel", self.channel.mention)]
-        embed = self.ona.quick_embed(content, title="Staff Logs", author=self.author, fields=fields)
-        await self.clean_up(await self.send(embed=embed))
-        try:
-            await self.guild.get_channel(self.guild_doc.staff_logs).send(embed=embed)
-        except AttributeError:
-            pass
 
     async def handle_file_url(self, url):
         '''For commands that require a file url, Ona first checks if the user attached a file.
