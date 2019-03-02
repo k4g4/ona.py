@@ -1,7 +1,6 @@
 import asyncio
 import discord
 from discord.ext import commands
-from .utils import in_guild
 
 char_limit = 2000
 
@@ -13,7 +12,7 @@ class OnaContext(commands.Context):
     def ona(self):
         return self.bot
 
-    # These doc properties are for reading purposes only. Use the doc_context methods for writing edits.
+    # These doc properties are for reading purposes only. Use the doc_ctx methods for writing edits.
     @property
     def guild_doc(self):
         return self.ona.guild_db.get_doc(self.guild.id if self.guild else 0)
@@ -169,9 +168,3 @@ class OnaContext(commands.Context):
         if not all(assertions):
             raise self.ona.OnaError(error)
         return True
-
-    def check_perm(self, perm):
-        '''Assert that Ona has the specified permission.'''
-        in_guild(self)
-        self.ona_assert(getattr(self.me.permissions_in(self.channel), perm),
-                        error=f"I need the `{perm.title()}` permission to do that.")

@@ -8,13 +8,14 @@ from .utils import OnaUtilsMixin, is_owner, not_blacklisted, not_silenced
 
 __author__ = 'kaga'
 
+config_files = ["config.ini", "secrets.ini", "guild.ini", "user.ini"]
+
 
 class Ona(commands.Bot, OnaUtilsMixin):
     '''A multipurpose Discord bot developed by Kaga#0690.'''
 
     def __init__(self):
         self.uptime = datetime.utcnow()
-        config_files = ["config.ini", "secrets.ini", "guild.ini", "user.ini"]
         self.config, self.secrets, guild_template, user_template = map(OnaConfigParser, config_files)
         self.guild_db = OnaDB(self, self.config.guild_db, guild_template.to_dict())
         self.user_db = OnaDB(self, self.config.user_db, user_template.to_dict())
@@ -42,7 +43,6 @@ class Ona(commands.Bot, OnaUtilsMixin):
     @commands.check(is_owner)
     async def reload(ctx):
         '''Update code for all commands, reload config settings, and refresh all cooldowns.'''
-        config_files = ["config.ini", "secrets.ini", "guild.ini", "user.ini"]
         ctx.ona.config, ctx.ona.secrets, guild_template, user_template = map(OnaConfigParser, config_files)
         ctx.ona.guild_db = OnaDB(ctx.ona, ctx.ona.config.guild_db, guild_template.to_dict())
         ctx.ona.user_db = OnaDB(ctx.ona, ctx.ona.config.user_db, user_template.to_dict())

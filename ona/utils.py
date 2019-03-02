@@ -73,6 +73,18 @@ def in_guild(ctx):
     return ctx.ona_assert(ctx.guild, error="You need to be in a server to use this command.")
 
 
+def ona_has_permissions(**perms):
+    '''Assert that Ona has the specified permission.'''
+    def check(ctx):
+        in_guild(ctx)
+        ona_perms = ctx.me.permissions_in(ctx.channel)
+        needed_perms = discord.Permissions()
+        needed_perms.update(**perms)
+        return ctx.ona_assert(ona_perms >= needed_perms,
+                              error=f"I need the `{list(perms)[0].title()}` permission to do that.")
+    return check
+
+
 def not_blacklisted(ctx):
     return ctx.ona_assert(ctx.channel.id not in ctx.guild_doc.blacklist,
                           error="Commands have been disabled in this channel.")

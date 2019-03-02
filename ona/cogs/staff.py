@@ -1,7 +1,7 @@
 import discord
 from json import loads, JSONDecodeError
 from discord.ext import commands
-from ona.utils import is_owner
+from ona.utils import is_owner, ona_has_permissions
 
 
 class Staff(commands.Cog):
@@ -12,9 +12,9 @@ class Staff(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(kick_members=True)
+    @commands.check(ona_has_permissions(kick_members=True))
     async def kick(self, ctx, *members: discord.Member):
         '''Kick one or more members from the server.'''
-        ctx.check_perm("kick_members")
         ctx.ona_assert(members, error="Give one or more members to kick.")
         await ctx.message.delete()
         for member in members:
@@ -28,9 +28,9 @@ class Staff(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(ban_members=True)
+    @commands.check(ona_has_permissions(ban_members=True))
     async def ban(self, ctx, *members: discord.Member):
         '''Ban one or more members from the server.'''
-        ctx.check_perm("ban_members")
         ctx.ona_assert(members, error="Give one or more members to kick.")
         await ctx.message.delete()
         for member in members:
@@ -44,14 +44,14 @@ class Staff(commands.Cog):
 
     @commands.command(aliases=['purge'])
     @commands.has_permissions(manage_messages=True)
+    @commands.check(ona_has_permissions(manage_messages=True))
     async def prune(self, ctx, count: int, filter: discord.Member = None):
         '''Prune multiple messages from the channel with an optional member filter.
         If the member filter is provided, only that member's messages are removed out of the number of
         messages given.'''
-        ctx.check_perm("manage_messages")
         ctx.ona_assert(count < ctx.guild_doc.max_prune,
                        error=f"You can only prune up to {ctx.guild_doc.max_prune} messages at a time.")
-        ctx.message.delete()
+        await ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
         await self.ona.log(ctx.guild, f"Pruned {self.ona.plural(len(pruned), 'message')}.", staff=True)
 
