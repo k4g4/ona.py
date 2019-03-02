@@ -34,19 +34,11 @@ class OnaUtilsMixin:
             params["searchType"] = "image"
         return requests.get("https://www.googleapis.com/customsearch/v1", params=params).json()["items"]
 
-    async def log(self, guild, content):
-        print(content)
-        embed = self.quick_embed(content, title="Ona Logger", timestamp=True)
+    async def log(self, guild, content, *, staff=False):
+        embed = self.quick_embed(content, title="Staff Logger" if staff else "Ona Logger", timestamp=True)
+        log_channel = self.guild_db.get_doc(guild.id)["staff_logs" if staff else "logs"]
         try:
-            await guild.get_channel(self.guild_db.get_doc(guild.id).logs).send(embed=embed)
-        except AttributeError:
-            pass
-
-    async def staff_log(self, guild, content):
-        fields = [("Channel", self.channel.mention)]
-        embed = self.ona.quick_embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
-        try:
-            await guild.get_channel(self.guild_db.get_doc(guild.id).staff_logs).send(embed=embed)
+            await guild.get_channel(log_channel).send(embed=embed)
         except AttributeError:
             pass
 

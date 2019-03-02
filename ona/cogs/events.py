@@ -16,7 +16,9 @@ class Events(commands.Cog):
         listening = discord.ActivityType.listening
         listening_to_help = discord.Activity(type=listening, name=f"{self.ona.guild_db.get_doc(0).prefix}help")
         await self.ona.change_presence(activity=listening_to_help)
-        await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), "Ona has logged in.")
+        content = "Ona has logged in."
+        print(content)
+        await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), content)
 
     @event
     async def on_message(self, message):
@@ -28,6 +30,7 @@ class Events(commands.Cog):
         if after.author.bot:
             return
         await self.ona.process_commands(after)
+        # await self.ona.log(before.guild, )
 
     @event
     async def on_command_error(self, ctx, error):
@@ -46,6 +49,7 @@ class Events(commands.Cog):
         elif isinstance(error, self.ona.OnaError):
             error_text = str(error)
         else:
+            print(error)
             await self.ona.log(self.ona.config.main_guild, f"Error: {error}")
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))

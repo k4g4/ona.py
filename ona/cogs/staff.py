@@ -24,7 +24,7 @@ class Staff(commands.Cog):
         else:
             content = (f"{ctx.author.display_name} kicked multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        await self.ona.staff_log(ctx.guild, content)
+        await self.ona.staff_log(ctx.guild, content, staff=True)
 
     @commands.command()
     @commands.has_permissions(ban_members=True)
@@ -40,7 +40,7 @@ class Staff(commands.Cog):
         else:
             content = (f"{ctx.author.display_name} banned multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        await self.ona.staff_log(ctx.guild, content)
+        await self.ona.log(ctx.guild, content, staff=True)
 
     @commands.command(aliases=['purge'])
     @commands.has_permissions(manage_messages=True)
@@ -53,7 +53,7 @@ class Staff(commands.Cog):
                        error=f"You can only prune up to {ctx.guild_doc.max_prune} messages at a time.")
         ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
-        await self.ona.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
+        await self.ona.log(ctx.guild, f"Pruned {self.ona.plural(len(pruned), 'message')}.", staff=True)
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -77,7 +77,7 @@ class Staff(commands.Cog):
                 guild_doc[setting] = loads(new_setting)
             except JSONDecodeError:
                 guild_doc[setting] = new_setting
-        await ctx.staff_log(f"`{setting}` is now set to `{ctx.guild_doc[setting]}`.")
+        await self.ona.staff_log(ctx.guild, f"`{setting}` is now set to `{ctx.guild_doc[setting]}`.")
 
     @commands.command(aliases=["shutdown"])
     @commands.check(is_owner)
@@ -113,8 +113,8 @@ class Staff(commands.Cog):
         '''Give or remove money from a user.'''
         with ctx.member_doc_ctx(member) as member_doc:
             member_doc.money += money
-        await ctx.staff_log((f"{member.display_name} {'gained' if money >= 0 else 'lost'} "
-                             f"{money} {ctx.guild_doc.currency}."))
+        await self.ona.staff_log(ctx.guild, (f"{member.display_name} {'gained' if money >= 0 else 'lost'} "
+                                             f"{money} {ctx.guild_doc.currency}."), staff=True)
 
 
 def setup(ona):
