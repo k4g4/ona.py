@@ -22,9 +22,11 @@ class OnaUtilsMixin:
     def get(self, iterable, **attrs):
         return discord.utils.get(iterable, **attrs)
 
-    def quick_embed(self, content="", *, title=None, timestamp=False, url=None, author=None, fields=[]):
+    def quick_embed(self, content="", *, title=None, timestamp=False, thumbnail=None, author=None, fields=[]):
         '''An embed factory method.'''
-        embed = discord.Embed(description=str(content), title=title, url=url, color=self.config.ona_color)
+        embed = discord.Embed(description=str(content), title=title, color=self.config.ona_color)
+        if thumbnail:
+            embed.set_thumbnail(url=thumbnail)
         if timestamp:
             embed.timestamp = datetime.utcnow()
         if author:
@@ -47,10 +49,11 @@ class OnaUtilsMixin:
         params = {"q": query, "key": self.secrets.google_key, "cx": self.secrets.google_engine_id}
         if image:
             params["searchType"] = "image"
-        return await self.download("https://www.googleapis.com/customsearch/v1", params=params)["items"]
+        return (await self.download("https://www.googleapis.com/customsearch/v1", params=params))["items"]
 
-    async def log(self, guild, content, *, staff=False):
-        embed = self.quick_embed(content, title="Staff Logger" if staff else "Ona Logger", timestamp=True)
+    async def log(self, guild, content, *, fields=[], staff=False):
+        title = "Staff Logger" if staff else "Ona Logger"
+        embed = self.quick_embed(content, title=title, timestamp=True, fields=fields)
         log_channel = self.guild_db.get_doc(guild.id)["staff_logs" if staff else "logs"]
         try:
             await guild.get_channel(log_channel).send(embed=embed)
@@ -64,22 +67,6 @@ class OnaUtilsMixin:
 
 
 # Various command checks
-
-def in_guild(ctx):
-    return ctx.ona.assert_(ctx.guild, error="You need to be in a server to use this command.")
-
-
-def ona_has_permissions(**perms):
-    '''Assert that Ona has the specified permission.'''
-    def check(ctx):
-        in_guild(ctx)
-        ona_perms = ctx.me.permissions_in(ctx.channel)
-        needed_perms = discord.Permissions()
-        needed_perms.update(**perms)
-        return ctx.ona.assert_(ona_perms >= needed_perms,
-                               error=f"I need the `{list(perms)[0].title()}` permission to do that.")
-    return commands.check(check)
-
 
 def not_blacklisted(ctx):
     return ctx.ona.assert_(ctx.channel.id not in ctx.guild_doc.blacklist,

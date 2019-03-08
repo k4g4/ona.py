@@ -43,6 +43,13 @@ class Events(commands.Cog):
                 error_text = f"You need the `{error.missing_perms[0].title()}` permission."
             else:
                 error_text = "You need to be in a server to use this command."
+        elif isinstance(error, commands.BotMissingPermissions):
+            if ctx.guild:
+                error_text = f"I need the `{error.missing_perms[0].title()}` permission to do that."
+            else:
+                error_text = "You need to be in a server to use this command."
+        elif isinstance(error, commands.NoPrivateMessage):
+            error_text = "You need to be in a server to use this command."
         elif isinstance(error, commands.CheckFailure):
             error_text = "You don't have permission to do that!"
         elif isinstance(error, self.ona.OnaError):

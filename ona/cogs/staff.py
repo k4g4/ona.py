@@ -1,7 +1,6 @@
 import discord
 from json import loads, JSONDecodeError
 from discord.ext import commands
-from ona.utils import ona_has_permissions
 
 
 class Staff(commands.Cog):
@@ -12,43 +11,45 @@ class Staff(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(kick_members=True)
-    @ona_has_permissions(kick_members=True)
+    @commands.bot_has_permissions(kick_members=True)
     async def kick(self, ctx, members: commands.Greedy[discord.Member], *, reason=None):
         '''Kick one or more members from the server.'''
         self.ona.assert_(members, error="Give one or more members to kick.")
         await ctx.message.delete()
         for member in members:
             await ctx.guild.kick(member, reason=f"{ctx.author.name}: {reason if reason else 'None provided'}")
+
         if len(members) == 1:
             content = f"{members[0].display_name} was kicked by {ctx.author.display_name}."
         else:
             content = (f"{ctx.author.display_name} kicked multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        if reason:
-            content += f"\nReason: {reason}"
-        await self.ona.staff_log(ctx.guild, content, staff=True)
+
+        fields = [("Reason", reason)] if reason else []
+        await self.ona.log(ctx.guild, content, fields=fields, staff=True)
 
     @commands.command()
     @commands.has_permissions(ban_members=True)
-    @ona_has_permissions(ban_members=True)
+    @commands.bot_has_permissions(ban_members=True)
     async def ban(self, ctx, members: commands.Greedy[discord.Member], *, reason=None):
         '''Ban one or more members from the server.'''
         self.ona.assert_(members, error="Give one or more members to kick.")
         await ctx.message.delete()
         for member in members:
             await ctx.guild.ban(member, reason=f"{ctx.author.name}: {reason if reason else 'None provided'}")
+
         if len(members) == 1:
             content = f"{members[0].display_name} was banned by {ctx.author.display_name}."
         else:
             content = (f"{ctx.author.display_name} banned multiple users:\n▫ " +
                        "\n▫ ".join(member.display_name for member in members))
-        if reason:
-            content += f"\nReason: {reason}"
-        await self.ona.log(ctx.guild, content, staff=True)
+
+        fields = [("Reason", reason)] if reason else []
+        await self.ona.log(ctx.guild, content, fields=fields, staff=True)
 
     @commands.command(aliases=['purge'])
     @commands.has_permissions(manage_messages=True)
-    @ona_has_permissions(manage_messages=True)
+    @commands.bot_has_permissions(manage_messages=True)
     async def prune(self, ctx, count: int, filter: discord.Member = None):
         '''Prune multiple messages from the channel with an optional member filter.
         If the member filter is provided, only that member's messages are removed out of the number of
@@ -61,7 +62,7 @@ class Staff(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(manage_emojis=True)
-    @ona_has_permissions(manage_emojis=True)
+    @commands.bot_has_permissions(manage_emojis=True)
     async def addemote(self, ctx, name: str = None, url: str = None):
         '''Create an emote in the server with the specified name.'''
         name = name if name else (await ctx.ask("Give a name for the emote:")).replace(" ", "_")
@@ -70,7 +71,7 @@ class Staff(commands.Cog):
             emote = await ctx.guild.create_custom_emoji(name=name, image=image)
         except discord.HTTPException as e:
             raise self.ona.OnaError(f"Either the emote limit has been reached or the name '{name}' is invalid.")
-        await self.ona.log(ctx.guild, f"An emote was added by {ctx.author.display_name}: {emote}", staff=True)
+        await self.ona.log(ctx.guild, f"An emote was added: {emote}", staff=True)
         await ctx.clean_up(await ctx.send(f"The emote has been added successfully. {emote}"))
 
     @commands.command()
@@ -95,7 +96,9 @@ class Staff(commands.Cog):
                 guild_doc[setting] = loads(new_setting)
             except JSONDecodeError:
                 guild_doc[setting] = new_setting
-        await self.ona.staff_log(ctx.guild, f"`{setting}` is now set to `{ctx.guild_doc[setting]}`.")
+        content = f"`{setting}` is now set to `{ctx.guild_doc[setting]}`."
+        await self.ona.log(ctx.guild, content, staff=True)
+        await ctx.clean_up(await ctx.send(content))
 
     @commands.command(aliases=["shutdown"])
     @commands.is_owner()
@@ -113,7 +116,9 @@ class Staff(commands.Cog):
     async def editavatar(self, ctx, url: str = None):
         '''Attach an image to change Ona's avatar.'''
         await self.ona.user.edit(avatar=await self.ona.download(await ctx.url_handler(url)))
-        await ctx.clean_up(await ctx.send("My avatar has been updated."))
+        content = "My avatar has been updated."
+        await self.ona.log(ctx.guild, content, staff=True)
+        await ctx.clean_up(await ctx.send(content))
 
     @commands.command(name="eval")
     @commands.is_owner()
@@ -132,6 +137,7 @@ class Staff(commands.Cog):
             member_doc.money += money
         content = f"{member.display_name} {'gained' if money >= 0 else 'lost'} {money} {ctx.guild_doc.currency}."
         await self.ona.log(ctx.guild, content, staff=True)
+        await ctx.clean_up(await ctx.send(content))
 
 
 def setup(ona):

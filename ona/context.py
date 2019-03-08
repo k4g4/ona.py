@@ -1,5 +1,7 @@
 import asyncio
 import discord
+from os import path
+from io import BytesIO
 from discord.ext import commands
 
 char_limit = 2000
@@ -42,34 +44,29 @@ class OnaContext(commands.Context):
     def has_any_role(self, role_ids):
         return any(role.id in role_ids for role in self.author.roles)
 
-    async def send(self, content="", *, multi=False, filename=None, **kwargs):
+    async def send(self, content="", *, multi=False, url=None, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
-        Discord character limit.'''
+        Discord character limit as well as the ability to upload an image from any url.'''
         if multi:
             while len(content) > char_limit:
                 await super().send(content[:char_limit])
                 content = content[char_limit:]
-        if filename:
-            kwargs["file"] = discord.File(filename)
+        if url:
+            kwargs["file"] = discord.File(BytesIO(await self.ona.download(url)), path.split(url)[1])
         return await super().send(content, **kwargs)
 
-    async def prompt(self, *args, **kwargs):
-        '''Ask the user a True or False question and return the resulting bool.'''
-        message = await self.send(*args, **kwargs)
-        await message.add_reaction("✅")
-        await message.add_reaction("❌")
-
-        def check(r, u):
-            return r.message.id == message.id and u == self.author and r.emoji in "✅❌"
-
+    async def prompt(self, content="", **kwargs):
+        '''Ask the user a yes or no question and return the resulting bool.'''
+        content += " (`yes` or `no`)"
+        prompt = await self.send(content, **kwargs)
         try:
             timeout = self.ona.config.response_timeout
-            reaction, _ = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
+            message = await self.ona.wait_for("message", timeout=timeout, check=lambda m: m.author == self.author)
         except asyncio.TimeoutError:
-            raise self.ona.OnaError("You took too long to react with ✅ or ❌.")
+            raise self.ona.OnaError("You took too long to respond.")
         finally:
-            await message.delete()
-        return reaction.emoji == "✅"
+            await self.channel.delete_messages([prompt, message])
+        return message.content.lower().startswith("y")
 
     async def ask(self, content="", options=[], *, embed=None, **kwargs):
         '''Ask the user for a response from a list of options and return the position of the chosen option.

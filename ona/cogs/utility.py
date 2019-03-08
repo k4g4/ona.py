@@ -2,12 +2,9 @@ import time
 import asyncio
 import discord
 from json import loads
-from os import path
-from io import BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from discord.ext import commands
-from ona.utils import in_guild
 
 
 class Utility(commands.Cog):
@@ -46,43 +43,70 @@ class Utility(commands.Cog):
             await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
 
     @commands.command()
-    @commands.check(in_guild)
+    @commands.guild_only()
     async def members(self, ctx):
         '''See how many members are in the server.'''
         await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {self.ona.config.heart_eyes}")
+
+    @commands.command(aliases=["server"])
+    @commands.guild_only()
+    async def serverinfo(self, ctx):
+        '''See detailed information about a server.'''
+        fields = [("Owner", ctx.guild.owner.mention), ("Members", f"{ctx.guild.member_count:,}"),
+                  ("ID", ctx.guild.id), ("Roles", len(ctx.guild.roles)),
+                  ("Created", ctx.guild.created_at.strftime("%b %d, %Y")),
+                  ("Channels", f"{len(ctx.guild.text_channels)} text, {len(ctx.guild.voice_channels)} voice"),
+                  ("Static Emotes", f"{len([str(emoji) for emoji in ctx.guild.emojis if not emoji.animated])} / 50"),
+                  ("Animated Emotes", f"{len([str(emoji) for emoji in ctx.guild.emojis if emoji.animated])} / 50")]
+        thumbnail = ctx.guild.icon_url_as(format="png")
+        embed = self.ona.quick_embed(title=ctx.guild.name, thumbnail=thumbnail, fields=fields)
+        await ctx.send(embed=embed)
 
     @commands.command(aliases=["avi", "pfp"])
     async def avatar(self, ctx, member: discord.Member = None):
         '''Display a user's avatar.'''
         member = member if member else ctx.author
-        avatar = BytesIO(await self.ona.download(member.avatar_url_as(static_format="png", size=256)))
-        await ctx.send(f"{member.display_name}'s avatar:", file=discord.File(avatar, f"{member.id}.png"))
+        await ctx.send(f"{member.display_name}'s avatar:", url=member.avatar_url_as(static_format="png", size=256))
 
     @commands.command(aliases=["emoji", "e"])
     async def emote(self, ctx, emoji: discord.PartialEmoji):
         '''Get a fullsize image for an emote. Only works for emotes in servers Ona shares.'''
-        await ctx.send(file=discord.File(BytesIO(await self.ona.download(emoji.url)), path.split(emoji.url)[1]))
+        await ctx.send(url=emoji.url)
 
-    @commands.command(aliases=["info", "userinfo"])
-    async def user(self, ctx, member: discord.Member = None):
-        '''See information about a user.'''
+    @commands.command(aliases=["info", "member"])
+    async def memberinfo(self, ctx, member: discord.Member = None):
+        '''See detailed information about a member.'''
         member = member if member else ctx.author
+        fields = [("Global Name", member.name), ("ID", member.id),
+                  ("Created", member.created_at.strftime("%b %d, %Y"))]
         if hasattr(member, "roles"):
-            roles = f"**Roles:** {', '.join(role.name for role in member.roles[1:][::-1])}"
-        else:
-            roles = ""
-        color = member.color if member.color.value else self.ona.config.ona_color
-        embed = discord.Embed(title=member.display_name, description=roles, color=color)
-        embed.set_thumbnail(url=member.avatar_url)
-        embed.add_field(name="Global Name", value=member.name).add_field(name="ID", value=member.id)
-        embed.add_field(name="Created", value=member.created_at.strftime("%b %d, %Y"))
+            fields.insert(0, ("Roles", f"{', '.join(role.name for role in member.roles[1:][::-1])}"))
         if hasattr(member, "joined_at"):
-            embed.add_field(name="Joined", value=member.joined_at.strftime("%b %d, %Y"))
+            fields.append(("Joined", member.joined_at.strftime("%b %d, %Y")))
         if member.activity:
-            if member.activity.type == discord.ActivityType.listening:
-                embed.add_field(name="Listening to", value=member.activity.title)
+            if member.activity.name == "Spotify":
+                fields.append(("Listening to", member.activity.title))
             else:
-                embed.add_field(name=member.activity.type.name.title(), value=member.activity.name)
+                fields.append((member.activity.type.name.title(), member.activity.name))
+        avatar = member.avatar_url_as(static_format="png")
+        embed = self.ona.quick_embed(title=member.display_name, thumbnail=avatar, fields=fields)
+        if member.color.value:
+            embed.color = member.color
+        await ctx.send(embed=embed)
+
+    @commands.command(aliases=["np"])
+    async def nowplaying(self, ctx, member: discord.Member = None):
+        '''See what a member is listening to on Spotify.'''
+        member = member if member else ctx.author
+        self.ona.assert_(member.activity.name == "Spotify",
+                         error="This member isn't listening to anything on Spotify right now.")
+        spotify = member.activity
+        fields = [("Album", spotify.album), ("Artists", ", ".join(spotify.artists))]
+        duration, current = spotify.duration, datetime.utcnow() - spotify.start
+        position = f"{current.seconds//60}:{current.seconds%60} / {duration.seconds//60}:{duration.seconds%60}"
+        fields.append(("Song Position", position))
+        thumbnail = spotify.album_cover_url
+        embed = self.ona.quick_embed(title=spotify.title, thumbnail=thumbnail, author=member, fields=fields)
         await ctx.send(embed=embed)
 
     @commands.command(aliases=["search", "g"])
@@ -104,7 +128,6 @@ class Utility(commands.Cog):
         '''Search for any image using Google.'''
         query = query if query else await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(query, image=True)
-
         embeds = []
         for result in results:
             embed = self.ona.quick_embed(result["title"], title="Search Results", author=ctx.author)
