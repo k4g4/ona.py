@@ -1,10 +1,9 @@
 from datetime import datetime
 from discord.ext import commands
 from .db import OnaDB
-from .context import OnaContext
 from .config_parser import OnaConfigParser
 from .help_formatter import OnaHelpFormatter
-from .utils import OnaUtilsMixin, is_owner, not_blacklisted, not_silenced
+from .utils import OnaUtilsMixin, not_blacklisted, not_silenced
 
 __author__ = 'kaga'
 
@@ -16,9 +15,8 @@ class Ona(commands.Bot, OnaUtilsMixin):
 
     def __init__(self):
         self.uptime = datetime.utcnow()
-        self.config, self.secrets, guild_template, user_template = map(OnaConfigParser, config_files)
-        self.guild_db = OnaDB(self, self.config.guild_db, guild_template.to_dict())
-        self.user_db = OnaDB(self, self.config.user_db, user_template.to_dict())
+        (self.config, self.secrets,
+         self.guild_template, self.user_template) = map(OnaConfigParser, config_files)
         formatter = OnaHelpFormatter(self, width=self.config.help_width)
 
         def get_prefix(ona, message):   # The prefix is chosen depending on the server's settings
@@ -30,30 +28,29 @@ class Ona(commands.Bot, OnaUtilsMixin):
         self.add_check(not_blacklisted)
         self.add_check(not_silenced)
 
-        for cog in self.config.cogs:
+        for extension in self.config.extensions:
             try:
-                self.load_extension(cog)
+                self.load_extension(extension)
             except Exception as e:
                 print(e)
 
     async def process_commands(self, message):
-        await self.invoke(await self.get_context(message, cls=OnaContext))
+        await self.invoke(await self.get_context(message, cls=self.OnaContext))
 
     @commands.command()
-    @commands.check(is_owner)
+    @commands.is_owner()
     async def reload(ctx):
-        '''Update code for all commands, reload config settings, and refresh all cooldowns.'''
-        ctx.ona.config, ctx.ona.secrets, guild_template, user_template = map(OnaConfigParser, config_files)
-        ctx.ona.guild_db = OnaDB(ctx.ona, ctx.ona.config.guild_db, guild_template.to_dict())
-        ctx.ona.user_db = OnaDB(ctx.ona, ctx.ona.config.user_db, user_template.to_dict())
-
+        '''Update code, reload config settings, and refresh all cooldowns.'''
+        (ctx.ona.config, ctx.ona.secrets,
+         ctx.ona.guild_template, ctx.ona.user_template) = map(OnaConfigParser, config_files)
         try:
-            for cog in ctx.ona.config.cogs:
-                ctx.ona.unload_extension(cog)
-                ctx.ona.load_extension(cog)
+            for extension in ctx.ona.config.extensions:
+                ctx.ona.unload_extension(extension)
+                ctx.ona.load_extension(extension)
         except Exception as e:
-            raise ctx.ona.OnaError(f"Error in {cog}: {e}")
+            raise ctx.ona.OnaError(f"Error in {extension}: {e}")
         else:
+            print("Reload completed successfully.")
             await ctx.clean_up(await ctx.send("All commands were reloaded successfully."))
 
     def run(self):

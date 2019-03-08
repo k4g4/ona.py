@@ -1,5 +1,5 @@
 import os
-import requests
+from aiohttp import ClientSession
 import discord
 from contextlib import contextmanager
 from datetime import timedelta, datetime
@@ -12,6 +12,12 @@ class OnaUtilsMixin:
     # All errors that are displayed to the user instead of being logged
     class OnaError(commands.CommandError):
         pass
+
+    def assert_(self, *assertions, error):
+        '''Assert that all provided assertions are True. If one is False, raise an OnaError.'''
+        if not all(assertions):
+            raise self.OnaError(error)
+        return True
 
     def get(self, iterable, **attrs):
         return discord.utils.get(iterable, **attrs)
@@ -27,19 +33,28 @@ class OnaUtilsMixin:
             embed.add_field(name=field[0], value=field[1])
         return embed
 
-    def search(self, query, image=False):
+    async def download(self, url, *, method="GET", **kwargs):
+        '''This helper coroutine downloads either a file or json object from a url.
+        If the url points to a file, the return value will be a bytes object. Otherwise it is a dict.'''
+        async with ClientSession(headers={"User-Agent": "Ona Agent"}) as session:
+            async with session.request(method, url, **kwargs) as result:
+                self.assert_(200 <= result.status < 300,
+                             error="An error occurred while connecting to the server. Try again!")
+                return await result.json() if result.content_type == "application/json" else await result.read()
+
+    async def google_search(self, query, image=False):
         '''Search Google with a query. Retrieve image results if image=True.'''
         params = {"q": query, "key": self.secrets.google_key, "cx": self.secrets.google_engine_id}
         if image:
             params["searchType"] = "image"
-        return requests.get("https://www.googleapis.com/customsearch/v1", params=params).json()["items"]
+        return await self.download("https://www.googleapis.com/customsearch/v1", params=params)["items"]
 
     async def log(self, guild, content, *, staff=False):
         embed = self.quick_embed(content, title="Staff Logger" if staff else "Ona Logger", timestamp=True)
         log_channel = self.guild_db.get_doc(guild.id)["staff_logs" if staff else "logs"]
         try:
             await guild.get_channel(log_channel).send(embed=embed)
-        except AttributeError:
+        except AttributeError:  # Ignore cases where a guild has no logs/staff_logs setting specified
             pass
 
     @staticmethod
@@ -47,30 +62,11 @@ class OnaUtilsMixin:
         value = int(value) if float(value).is_integer() else value  # Remove .0 if it exists
         return f"one {word}" if value == 1 else f"{value:,} {word}s"
 
-    @staticmethod
-    @contextmanager
-    def download(url):
-        '''This helper coroutine downloads a file from a url and yields it to a context manager,
-        then deletes the file once the context manager exits.'''
-        filename = os.path.split(url)[1].partition("size")[0]
-        req = requests.get(url, headers={"User-Agent": "Ona Agent"})
-        with open(filename, 'wb') as fd:
-            for chunk in req.iter_content(chunk_size=128):
-                fd.write(chunk)
-        try:
-            yield filename
-        finally:
-            os.remove(filename)
-
 
 # Various command checks
 
-def is_owner(ctx):
-    return ctx.ona.is_owner(ctx.author)
-
-
 def in_guild(ctx):
-    return ctx.ona_assert(ctx.guild, error="You need to be in a server to use this command.")
+    return ctx.ona.assert_(ctx.guild, error="You need to be in a server to use this command.")
 
 
 def ona_has_permissions(**perms):
@@ -80,23 +76,23 @@ def ona_has_permissions(**perms):
         ona_perms = ctx.me.permissions_in(ctx.channel)
         needed_perms = discord.Permissions()
         needed_perms.update(**perms)
-        return ctx.ona_assert(ona_perms >= needed_perms,
-                              error=f"I need the `{list(perms)[0].title()}` permission to do that.")
-    return check
+        return ctx.ona.assert_(ona_perms >= needed_perms,
+                               error=f"I need the `{list(perms)[0].title()}` permission to do that.")
+    return commands.check(check)
 
 
 def not_blacklisted(ctx):
-    return ctx.ona_assert(ctx.channel.id not in ctx.guild_doc.blacklist,
-                          error="Commands have been disabled in this channel.")
+    return ctx.ona.assert_(ctx.channel.id not in ctx.guild_doc.blacklist,
+                           error="Commands have been disabled in this channel.")
 
 
 def not_silenced(ctx):
     if ctx.channel.id not in ctx.guild_doc.chat_throttle:
         return True
-    ctx.ona_assert(not ctx.guild or not ctx.has_role(ctx.guild_doc.silenced),
-                   error="You've been silenced. Use a bot channel instead.")
-    return ctx.ona_assert(not ctx.guild or all(role.id != ctx.guild_doc.silenced for role in ctx.guild.me.roles),
-                          error="I'm on silent mode. Try again later!")
+    ctx.ona.assert_(not ctx.guild or not ctx.has_role(ctx.guild_doc.silenced),
+                    error="You've been silenced. Use a bot channel instead.")
+    return ctx.ona.assert_(not ctx.guild or all(role.id != ctx.guild_doc.silenced for role in ctx.guild.me.roles),
+                           error="I'm on silent mode. Try again later!")
 
 
 # This check ignores all channels not on the image_throttle list
@@ -105,8 +101,8 @@ async def image_throttle(ctx):
         return True
     # OnaError if there are too many images in the channel
     last_ten = await ctx.history(limit=10).flatten()
-    return ctx.ona_assert(sum(len(message.attachments) for message in last_ten) > 2,
-                          error="There are too many images here. Try again later!")
+    return ctx.ona.assert_(sum(len(message.attachments) for message in last_ten) > 2,
+                           error="There are too many images here. Try again later!")
 
 
 # This check ignores all channels not on the chat_throttle list
@@ -116,5 +112,5 @@ async def chat_throttle(ctx):
     # OnaError if the 10th oldest message is <40 seconds old
     async for message in ctx.history(limit=10):
         oldest = message
-    return ctx.ona_assert(oldest.timestamp + timedelta(0, 40) > datetime.utcnow(),
-                          error="The chat is too active. Try again later!")
+    return ctx.ona.assert_(oldest.timestamp + timedelta(0, 40) > datetime.utcnow(),
+                           error="The chat is too active. Try again later!")

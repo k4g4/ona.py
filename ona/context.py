@@ -53,7 +53,7 @@ class OnaContext(commands.Context):
             kwargs["file"] = discord.File(filename)
         return await super().send(content, **kwargs)
 
-    async def yes_or_no(self, *args, **kwargs):
+    async def prompt(self, *args, **kwargs):
         '''Ask the user a True or False question and return the resulting bool.'''
         message = await self.send(*args, **kwargs)
         await message.add_reaction("✅")
@@ -71,14 +71,14 @@ class OnaContext(commands.Context):
             await message.delete()
         return reaction.emoji == "✅"
 
-    async def ask(self, content="", options=[], *, use_embed=False, embed=None, **kwargs):
+    async def ask(self, content="", options=[], *, embed=None, **kwargs):
         '''Ask the user for a response from a list of options and return the position of the chosen option.
         If no option list is provided, return any response from the user as a string.'''
         if embed:
             embed.description = embed.description if embed.description else ""
         for i, option in enumerate(options, 1):
             row = f"\n▫ {i}) {option}"
-            if use_embed:
+            if embed:
                 embed.description += row
             else:
                 content += row
@@ -94,9 +94,8 @@ class OnaContext(commands.Context):
             response = await self.ona.wait_for("message", timeout=timeout, check=check)
         except asyncio.TimeoutError:
             raise self.ona.OnaError("You took too long to respond.")
-        if isinstance(self.channel, discord.TextChannel):
-            if self.channel.permissions_for(self.me).manage_messages:
-                await self.channel.delete_messages([message, response])
+        if self.guild and self.channel.permissions_for(self.me).manage_messages:
+            await self.channel.delete_messages([message, response])
         if options:
             return int(response.content) - 1    # The returned value is an index of the options list
         return response.content     # No options were provided
@@ -104,11 +103,9 @@ class OnaContext(commands.Context):
     async def embed_browser(self, embeds, pos=0):
         '''Send a list of embeds to display each one along with reaction based controls to navigate through
         them. The pos parameter decides which embed should be shown first.'''
-        can_remove_reacts = (isinstance(self.channel, discord.TextChannel) and
-                             self.channel.permissions_for(self.me).manage_messages)
+        can_remove_reacts = self.guild and self.channel.permissions_for(self.me).manage_messages
 
-        # Add page numbers to each embed
-        for i, embed in enumerate(embeds, 1):
+        for i, embed in enumerate(embeds, 1):   # Add page numbers to each embed
             embed.set_footer(text=f"Page {i} of {len(embeds)}")
         message = await self.send(embed=embeds[pos])
         await message.add_reaction("⬅")
@@ -137,7 +134,7 @@ class OnaContext(commands.Context):
     async def clean_up(self, *messages):
         '''When done with a command, call clean_up with an argument-list of messages to delete them all
         as well as the initial command message if Ona has permission.'''
-        if not isinstance(self.channel, discord.TextChannel):
+        if not self.guild:
             return
         if self.channel.permissions_for(self.me).manage_messages:
             messages += (self.message,)
@@ -147,11 +144,11 @@ class OnaContext(commands.Context):
     async def whisper(self, *args, **kwargs):
         """DM a user instead of sending a message to the chat."""
         message = await self.author.send(*args, **kwargs)
-        if isinstance(self.channel, discord.TextChannel):
+        if self.guild:
             await self.clean_up(await self.send(f"{self.author.mention} Check your DM!"))
         return message
 
-    async def handle_file_url(self, url):
+    async def url_handler(self, url):
         '''For commands that require a file url, Ona first checks if the user attached a file.
         If no file was attached and no file url was given, Ona searches chat history for
         the most recent file attachment.'''
@@ -159,12 +156,13 @@ class OnaContext(commands.Context):
             return self.message.attachments[0].url
         if url:
             return url
+        use_last = await self.prompt(("No image attachment or url was given. "
+                                      "Use the most recent image attachment in the channel instead?"))
+        self.ona.assert_(use_last, error="Try the command again with a url or image attachment.")
         message = await self.history().find(lambda m: len(m.attachments))
-        self.ona_assert(message is not None, error="No image was provided.")
+        self.ona.assert_(message is not None, error="No image was provided.")
         return message.attachments[0].url
 
-    def ona_assert(self, *assertions, error):
-        '''Assert that all provided assertions are True. If one is False, raise an OnaError.'''
-        if not all(assertions):
-            raise self.ona.OnaError(error)
-        return True
+
+def setup(ona):
+    ona.OnaContext = OnaContext

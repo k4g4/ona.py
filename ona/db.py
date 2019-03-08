@@ -14,12 +14,11 @@ class OnaDocument(dict):
 class OnaDB:
     '''Database interactions are handled here.'''
 
-    def __init__(self, ona, collection, template):
-        self.ona = ona
-        self.client = MongoClient(self.ona.secrets.host, self.ona.secrets.port)
+    def __init__(self, host, port, collection, template, db_cache_size):
+        self.client = MongoClient(host, port)
         self.collection = self.client.ona[collection]
         self.template = template
-        self.doc_cache = LRUCache(self.ona.config.max_db_cache)
+        self.doc_cache = LRUCache(db_cache_size)
 
     def get_doc(self, _id):
         if _id in self.doc_cache:
@@ -43,3 +42,10 @@ class OnaDB:
         doc = self.get_doc(_id)
         yield doc
         self.update_doc(doc)
+
+
+def setup(ona):
+    ona.guild_db = OnaDB(ona.secrets.host, ona.secrets.port,
+                         ona.config.guild_db, ona.guild_template.to_dict(), ona.config.db_cache_size)
+    ona.user_db = OnaDB(ona.secrets.host, ona.secrets.port,
+                        ona.config.user_db, ona.user_template.to_dict(), ona.config.db_cache_size)

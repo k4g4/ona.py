@@ -1,8 +1,9 @@
 import time
 import asyncio
-import requests
 import discord
 from json import loads
+from os import path
+from io import BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from discord.ext import commands
@@ -54,14 +55,13 @@ class Utility(commands.Cog):
     async def avatar(self, ctx, member: discord.Member = None):
         '''Display a user's avatar.'''
         member = member if member else ctx.author
-        with self.ona.download(member.avatar_url_as(static_format="png", size=256)) as avatar_file:
-            await ctx.send(f"{member.display_name}'s avatar:", file=discord.File(avatar_file))
+        avatar = BytesIO(await self.ona.download(member.avatar_url_as(static_format="png", size=256)))
+        await ctx.send(f"{member.display_name}'s avatar:", file=discord.File(avatar, f"{member.id}.png"))
 
     @commands.command(aliases=["emoji", "e"])
-    async def emote(self, ctx, emoji: discord.Emoji):
+    async def emote(self, ctx, emoji: discord.PartialEmoji):
         '''Get a fullsize image for an emote. Only works for emotes in servers Ona shares.'''
-        with self.ona.download(emoji.url) as emoji_file:
-            await ctx.send(file=discord.File(emoji_file))
+        await ctx.send(file=discord.File(BytesIO(await self.ona.download(emoji.url)), path.split(emoji.url)[1]))
 
     @commands.command(aliases=["info", "userinfo"])
     async def user(self, ctx, member: discord.Member = None):
@@ -90,7 +90,7 @@ class Utility(commands.Cog):
     async def google(self, ctx, *, query: str):
         '''Search for anything on Google.'''
         query = query if query else await ctx.ask("Give a word or phrase to search:")
-        fields = [(result["title"], result["link"]) for result in self.ona.search(query)]
+        fields = [(result["title"], result["link"]) for result in await self.ona.google_search(query)]
         embeds = []
         per_page = 5
         for i in range(0, len(fields), per_page):
@@ -103,7 +103,7 @@ class Utility(commands.Cog):
     async def imagesearch(self, ctx, *, query: str):
         '''Search for any image using Google.'''
         query = query if query else await ctx.ask("Give a word or phrase to search:")
-        results = self.ona.search(query, image=True)
+        results = await self.ona.google_search(query, image=True)
 
         embeds = []
         for result in results:
@@ -116,8 +116,8 @@ class Utility(commands.Cog):
     async def youtube(self, ctx, *, query: str):
         '''Search for a video on YouTube.'''
         query = query if query else await ctx.ask("Give a word or phrase to search:")
-        query = f"youtube {query}"
-        await ctx.send(next(item["link"] for item in self.ona.search(query) if "youtube.com/watch" in item["link"]))
+        results = await self.ona.google_search(f"youtube {query}")
+        await ctx.send(next(item["link"] for item in results if "youtube.com/watch" in item["link"]))
 
     @commands.command()
     @commands.cooldown(2, 15, commands.BucketType.user)
@@ -127,10 +127,10 @@ class Utility(commands.Cog):
         search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
         headers = {"app_id": self.ona.secrets.oxford_id, "app_key": self.ona.secrets.oxford_key}
         params = {"q": query, "limit": 1}
-        results = requests.get(search_url, headers=headers, params=params).json()["results"]
-        ctx.ona_assert(len(results), error=f"'{query}' is not an English word.")
+        results = self.ona.download(search_url, params=params, headers=headers)["results"]
+        self.ona.assert_(len(results), error=f"'{query}' is not an English word.")
         entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + results[0]["id"].lower()
-        lex_entries = requests.get(entry_url, headers=headers).json()["results"][0]["lexicalEntries"]
+        lex_entries = self.ona.download(entry_url, headers=headers)["results"][0]["lexicalEntries"]
 
         def combine_defs(lex_entry):    # flatten each lexical entry into a list of definitions
             senses = (sense for entry in lex_entry["entries"] for sense in entry["senses"] if "definitions" in sense)
@@ -149,8 +149,8 @@ class Utility(commands.Cog):
         username = username if username else await ctx.ask("Give a username to search for:")
         mode = await ctx.ask("Choose a gamemode:", ["Standard", "Taiko", "Catch the Beat", "Mania"])
         params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
-        result = requests.get("https://osu.ppy.sh/api/get_user", params=params).json()
-        ctx.ona_assert(res.text != [], error="The username/id provided is invalid.")
+        result = self.ona.download("https://osu.ppy.sh/api/get_user", params=params)
+        self.ona.assert_(result.text != [], error="The username/id provided is invalid.")
 
         # All stats are provided as strings by default. Convert to python objects.
         osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in result[0].items()}
@@ -170,20 +170,18 @@ class Utility(commands.Cog):
     @commands.command(aliases=["sauce"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def source(self, ctx, url: str = None):
-        '''Reverse image search any image. Either attach an image, post its url, or automatically use the
-        most recently posted image in the channel.'''
-        url = await handle_file_url(url)
-        loop = asyncio.get_event_loop()
-        res = await loop.run_in_executor(None, requests.post, "http://iqdb.org", {"url": url})
-        ctx.ona_assert("No relevant matches" not in res.text, "HTTP request failed" not in res.text,
-                       error="No results found.")
+        '''Perform a reverse image search using iqdb.org.'''
+        url = await ctx.url_handler(url)
+        body = (await self.ona.download("http://iqdb.org", method="POST", data={"url": url})).decode()
+        self.ona.assert_("No relevant matches" not in body, "HTTP request failed" not in body,
+                         error="No results found.")
         parser = HTMLParser()
         urls = []
 
         def handler(tag, attrs):    # This handler parses the iqdb.org response html for all href links
             any(urls.append(attr[1]) for attr in attrs if attr[0] == "href")
         parser.handle_starttag = handler
-        parser.feed(res.text)
+        parser.feed(body)
         url = urls[2]   # The second href is the "best match"
         if url.startswith("//"):    # Fix links
             url = f"https:{url}"

@@ -30,7 +30,6 @@ class Events(commands.Cog):
         if after.author.bot:
             return
         await self.ona.process_commands(after)
-        # await self.ona.log(before.guild, )
 
     @event
     async def on_command_error(self, ctx, error):
@@ -50,7 +49,7 @@ class Events(commands.Cog):
             error_text = str(error)
         else:
             print(error)
-            await self.ona.log(self.ona.config.main_guild, f"Error: {error}")
+            await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), f"Error: {error}")
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))
 
