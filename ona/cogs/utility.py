@@ -30,18 +30,6 @@ class Utility(commands.Cog):
         uptime = self.ona.plural(delta.days, 'day') if delta.days else self.ona.plural(delta.seconds, 'second')
         await ctx.clean_up(await ctx.send(f"I've been running for {uptime}."))
 
-    @commands.command(aliases=["commands"])
-    async def help(self, ctx, command_name: str = None):
-        '''Display help for any or all of Ona's commands.'''
-        if command_name:
-            try:
-                command = next(cmd for cmd in self.ona.commands if command_name.lower() in [cmd.name] + cmd.aliases)
-            except StopIteration:
-                raise self.ona.OnaError("That is not a valid command name.")
-            await ctx.send(embed=await self.ona.formatter.format_help_for(ctx, command))
-        else:
-            await ctx.whisper(embed=await self.ona.formatter.format_help_for(ctx, self.ona))
-
     @commands.command()
     @commands.guild_only()
     async def members(self, ctx):
@@ -65,18 +53,19 @@ class Utility(commands.Cog):
     @commands.command(aliases=["avi", "pfp"])
     async def avatar(self, ctx, member: discord.Member = None):
         '''Display a user's avatar.'''
-        member = member if member else ctx.author
+        member = member or ctx.author
         await ctx.send(f"{member.display_name}'s avatar:", url=member.avatar_url_as(static_format="png", size=256))
 
     @commands.command(aliases=["emoji", "e"])
     async def emote(self, ctx, emoji: discord.PartialEmoji):
-        '''Get a fullsize image for an emote. Only works for emotes in servers Ona shares.'''
+        '''Get a fullsize image for an emote.
+        Only works for emotes in servers Ona shares.'''
         await ctx.send(url=emoji.url)
 
     @commands.command(aliases=["info", "member"])
     async def memberinfo(self, ctx, member: discord.Member = None):
         '''See detailed information about a member.'''
-        member = member if member else ctx.author
+        member = member or ctx.author
         fields = [("Global Name", member.name), ("ID", member.id),
                   ("Created", member.created_at.strftime("%b %d, %Y"))]
         if hasattr(member, "roles"):
@@ -97,7 +86,7 @@ class Utility(commands.Cog):
     @commands.command(aliases=["np"])
     async def nowplaying(self, ctx, member: discord.Member = None):
         '''See what a member is listening to on Spotify.'''
-        member = member if member else ctx.author
+        member = member or ctx.author
         self.ona.assert_(member.activity.name == "Spotify",
                          error="This member isn't listening to anything on Spotify right now.")
         spotify = member.activity
@@ -113,7 +102,7 @@ class Utility(commands.Cog):
     @commands.cooldown(2, 15, commands.BucketType.user)
     async def google(self, ctx, *, query: str):
         '''Search for anything on Google.'''
-        query = query if query else await ctx.ask("Give a word or phrase to search:")
+        query = query or await ctx.ask("Give a word or phrase to search:")
         fields = [(result["title"], result["link"]) for result in await self.ona.google_search(query)]
         embeds = []
         per_page = 5
@@ -126,7 +115,7 @@ class Utility(commands.Cog):
     @commands.cooldown(2, 15, commands.BucketType.user)
     async def imagesearch(self, ctx, *, query: str):
         '''Search for any image using Google.'''
-        query = query if query else await ctx.ask("Give a word or phrase to search:")
+        query = query or await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(query, image=True)
         embeds = []
         for result in results:
@@ -146,18 +135,19 @@ class Utility(commands.Cog):
     @commands.cooldown(2, 15, commands.BucketType.user)
     async def define(self, ctx, *, query: str):
         '''Find the definition for a word or phrase.'''
-        query = query if query else await ctx.ask("Give a word or phrase to define:")
+        query = query or await ctx.ask("Give a word or phrase to define:")
         search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
         headers = {"app_id": self.ona.secrets.oxford_id, "app_key": self.ona.secrets.oxford_key}
         params = {"q": query, "limit": 1}
-        results = self.ona.download(search_url, params=params, headers=headers)["results"]
+        results = self.ona.request(search_url, params=params, headers=headers)["results"]
         self.ona.assert_(len(results), error=f"'{query}' is not an English word.")
         entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + results[0]["id"].lower()
-        lex_entries = self.ona.download(entry_url, headers=headers)["results"][0]["lexicalEntries"]
+        lex_entries = self.ona.request(entry_url, headers=headers)["results"][0]["lexicalEntries"]
 
         def combine_defs(lex_entry):    # flatten each lexical entry into a list of definitions
             senses = (sense for entry in lex_entry["entries"] for sense in entry["senses"] if "definitions" in sense)
-            return [(sense.get("domains", ["Misc"])[0], sense["definitions"][0].capitalize()) for sense in senses]
+            return [(sense.get("domains", ["Misc"])[0], sense["definitions"][0].capitalize())
+                    for sense in senses]
 
         pages = [(lex_entry["lexicalCategory"], combine_defs(lex_entry)) for lex_entry in lex_entries]
         embeds = []
@@ -168,15 +158,17 @@ class Utility(commands.Cog):
 
     @commands.command()
     async def osu(self, ctx, *, username: str):
-        '''Search for an osu! profile. Provide either an osu! username or user id.'''
-        username = username if username else await ctx.ask("Give a username to search for:")
+        '''Search for an osu! profile.
+        Provide either an osu! username or user id.'''
+        username = username or await ctx.ask("Give a username to search for:")
         mode = await ctx.ask("Choose a gamemode:", ["Standard", "Taiko", "Catch the Beat", "Mania"])
         params = {"k": self.ona.secrets.osu_key, "u": username, "m": mode}
-        result = self.ona.download("https://osu.ppy.sh/api/get_user", params=params)
+        result = self.ona.request("https://osu.ppy.sh/api/get_user", params=params)
         self.ona.assert_(result.text != [], error="The username/id provided is invalid.")
 
         # All stats are provided as strings by default. Convert to python objects.
-        osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v for k, v in result[0].items()}
+        osu_user = {k: loads(v) if str(v).replace(".", "").isdigit() else v
+                    for k, v in result[0].items()}
         url = f"https://osu.ppy.sh/osu_users/{osu_user['user_id']}"
         stats = [
             ("Rank", f"{osu_user['pp_rank']:,} ({osu_user['pp_country_rank']:,} {osu_user['country']})"),
@@ -194,21 +186,21 @@ class Utility(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def source(self, ctx, url: str = None):
         '''Perform a reverse image search using iqdb.org.'''
-        url = await ctx.url_handler(url)
-        body = (await self.ona.download("http://iqdb.org", method="POST", data={"url": url})).decode()
+        url = url or await ctx.get_attachment()
+        body = (await self.ona.request("http://iqdb.org", method="POST", data={"url": url})).decode()
         self.ona.assert_("No relevant matches" not in body, "HTTP request failed" not in body,
                          error="No results found.")
         parser = HTMLParser()
-        urls = []
+        hrefs = []
 
         def handler(tag, attrs):    # This handler parses the iqdb.org response html for all href links
-            any(urls.append(attr[1]) for attr in attrs if attr[0] == "href")
+            any(hrefs.append(attr[1]) for attr in attrs if attr[0] == "href")
         parser.handle_starttag = handler
         parser.feed(body)
-        url = urls[2]   # The second href is the "best match"
-        if url.startswith("//"):    # Fix links
-            url = f"https:{url}"
-        await ctx.send(f"Here's the closest match:\n{url}")
+        href = hrefs[2]   # The second href is the "best match"
+        if href.startswith("//"):    # Fix links
+            href = f"https:{href}"
+        await ctx.send(f"Here's the closest match:\n{href}")
 
 
 def setup(ona):

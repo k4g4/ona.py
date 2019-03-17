@@ -1,6 +1,5 @@
 import asyncio
 import discord
-from os import path
 from io import BytesIO
 from discord.ext import commands
 
@@ -17,21 +16,21 @@ class OnaContext(commands.Context):
     # These doc properties are for reading purposes only. Use the doc_ctx methods for writing edits.
     @property
     def guild_doc(self):
-        return self.ona.guild_db.get_doc(self.guild.id if self.guild else 0)
+        return self.ona.guild_db.get_doc(self.guild)
 
     @property
     def author_doc(self):
-        return self.ona.user_db.get_doc(self.author.id)
+        return self.ona.user_db.get_doc(self.author)
 
     # These context managers yield OnaDocument objects, and changes to the objects update the db on exit.
     def guild_doc_ctx(self):
-        return self.ona.guild_db.doc_context(self.guild.id if self.guild else 0)
+        return self.ona.guild_db.doc_context(self.guild)
 
     def author_doc_ctx(self):
-        return self.ona.user_db.doc_context(self.author.id)
+        return self.ona.user_db.doc_context(self.author)
 
     def member_doc_ctx(self, member):
-        return self.ona.user_db.doc_context(member.id)
+        return self.ona.user_db.doc_context(member)
 
     def get_role_named(self, name):
         '''Return a role in the context's guild if it exists, otherwise None.'''
@@ -52,7 +51,7 @@ class OnaContext(commands.Context):
                 await super().send(content[:char_limit])
                 content = content[char_limit:]
         if url:
-            kwargs["file"] = discord.File(BytesIO(await self.ona.download(url)), path.split(url)[1])
+            kwargs["file"] = discord.File(BytesIO(await self.ona.request(url)), self.ona.filename_from_url(url))
         return await super().send(content, **kwargs)
 
     async def prompt(self, content="", **kwargs):
@@ -118,7 +117,7 @@ class OnaContext(commands.Context):
             except asyncio.TimeoutError:
                 break
             if can_remove_reacts:
-                await message.remove_reaction(reaction.emoji, user)
+                await reaction.remove(user)
             if user == self.author:
                 # Increment or decrement the position according to the reaction, unless at either end of the list
                 pos += 1 if reaction.emoji == "➡" and pos < len(embeds) - 1 else 0
@@ -142,22 +141,14 @@ class OnaContext(commands.Context):
         """DM a user instead of sending a message to the chat."""
         message = await self.author.send(*args, **kwargs)
         if self.guild:
-            await self.clean_up(await self.send(f"{self.author.mention} Check your DM!"))
+            await self.send(f"{self.author.mention} Check your DM!")
         return message
 
-    async def url_handler(self, url):
-        '''For commands that require a file url, Ona first checks if the user attached a file.
-        If no file was attached and no file url was given, Ona searches chat history for
-        the most recent file attachment.'''
-        if self.message.attachments:
-            return self.message.attachments[0].url
-        if url:
-            return url
-        use_last = await self.prompt(("No image attachment or url was given. "
-                                      "Use the most recent image attachment in the channel instead?"))
-        self.ona.assert_(use_last, error="Try the command again with a url or image attachment.")
+    async def get_attachment(self):
+        '''For commands that require a file attachment, first check if the user attached a file.
+        If no file was attached, search chat history for the most recent file attachment.'''
         message = await self.history().find(lambda m: len(m.attachments))
-        self.ona.assert_(message is not None, error="No image was provided.")
+        self.ona.assert_(message, error="No file attachment was found.")
         return message.attachments[0].url
 
 

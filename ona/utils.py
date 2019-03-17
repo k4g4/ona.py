@@ -1,4 +1,3 @@
-import os
 from aiohttp import ClientSession
 import discord
 from contextlib import contextmanager
@@ -35,9 +34,9 @@ class OnaUtilsMixin:
             embed.add_field(name=field[0], value=field[1])
         return embed
 
-    async def download(self, url, *, method="GET", **kwargs):
-        '''This helper coroutine downloads either a file or json object from a url.
-        If the url points to a file, the return value will be a bytes object. Otherwise it is a dict.'''
+    async def request(self, url, *, method="GET", **kwargs):
+        '''This helper coroutine makes a request to a url.
+        If the request returns JSON, this coroutine returns a dict. Otherwise, it returns a bytes object.'''
         async with ClientSession(headers={"User-Agent": "Ona Agent"}) as session:
             async with session.request(method, url, **kwargs) as result:
                 self.assert_(200 <= result.status < 300,
@@ -49,12 +48,12 @@ class OnaUtilsMixin:
         params = {"q": query, "key": self.secrets.google_key, "cx": self.secrets.google_engine_id}
         if image:
             params["searchType"] = "image"
-        return (await self.download("https://www.googleapis.com/customsearch/v1", params=params))["items"]
+        return (await self.request("https://www.googleapis.com/customsearch/v1", params=params))["items"]
 
     async def log(self, guild, content, *, fields=[], staff=False):
         title = "Staff Logger" if staff else "Ona Logger"
         embed = self.quick_embed(content, title=title, timestamp=True, fields=fields)
-        log_channel = self.guild_db.get_doc(guild.id)["staff_logs" if staff else "logs"]
+        log_channel = self.guild_db.get_doc(guild)["staff_logs" if staff else "logs"]
         try:
             await guild.get_channel(log_channel).send(embed=embed)
         except AttributeError:  # Ignore cases where a guild has no logs/staff_logs setting specified
@@ -64,6 +63,10 @@ class OnaUtilsMixin:
     def plural(value, word):
         value = int(value) if float(value).is_integer() else value  # Remove .0 if it exists
         return f"one {word}" if value == 1 else f"{value:,} {word}s"
+
+    @staticmethod
+    def filename_from_url(url):
+        return url.split("/")[-1].split("?")[0]
 
 
 # Various command checks

@@ -51,9 +51,8 @@ class Staff(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @commands.bot_has_permissions(manage_messages=True)
     async def prune(self, ctx, count: int, filter: discord.Member = None):
-        '''Prune multiple messages from the channel with an optional member filter.
-        If the member filter is provided, only that member's messages are removed out of the number of
-        messages given.'''
+        '''Prune multiple messages from a channel.
+        If a member is provided, only that member's messages are removed out of the number of messages given.'''
         self.ona.assert_(count < ctx.guild_doc.max_prune,
                          error=f"You can only prune up to {ctx.guild_doc.max_prune} messages at a time.")
         await ctx.message.delete()
@@ -65,8 +64,8 @@ class Staff(commands.Cog):
     @commands.bot_has_permissions(manage_emojis=True)
     async def addemote(self, ctx, name: str = None, url: str = None):
         '''Create an emote in the server with the specified name.'''
-        name = name if name else (await ctx.ask("Give a name for the emote:")).replace(" ", "_")
-        image = await self.ona.download(await ctx.url_handler(url))
+        name = name or (await ctx.ask("Give a name for the emote:")).replace(" ", "_")
+        image = await self.ona.request(url or await ctx.get_attachment())
         try:
             emote = await ctx.guild.create_custom_emoji(name=name, image=image)
         except discord.HTTPException as e:
@@ -83,8 +82,9 @@ class Staff(commands.Cog):
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def editsetting(self, ctx, setting: str = None, value: str = None):
-        '''Change any settings on a server. For a full list of settings, use the `settings` command.'''
-        setting = setting if setting else await ctx.ask("Which setting would you like to edit?")
+        '''Change any settings on a server.
+        For a full list of settings, use the `settings` command.'''
+        setting = setting or await ctx.ask("Which setting would you like to edit?")
         self.ona.assert_(setting in self.ona.guild_db.template,
                          error="That isn't a valid setting. Use `{ctx.guild_doc.prefix}settings` to see all settings.")
         with ctx.guild_doc_ctx() as guild_doc:
@@ -114,8 +114,8 @@ class Staff(commands.Cog):
     @commands.command(pass_context=True, aliases=['editavi'])
     @commands.is_owner()
     async def editavatar(self, ctx, url: str = None):
-        '''Attach an image to change Ona's avatar.'''
-        await self.ona.user.edit(avatar=await self.ona.download(await ctx.url_handler(url)))
+        '''Change Ona's avatar.'''
+        await self.ona.user.edit(avatar=await self.ona.request(url or await ctx.get_attachment()))
         content = "My avatar has been updated."
         await self.ona.log(ctx.guild, content, staff=True)
         await ctx.clean_up(await ctx.send(content))

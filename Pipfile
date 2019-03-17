@@ -10,6 +10,7 @@ verify_ssl = true
 requests = "*"
 pymongo = "*"
 cachetools = "*"
+pillow = "*"
 
 [requires]
 python_version = "3.6"

@@ -20,7 +20,9 @@ class OnaDB:
         self.template = template
         self.doc_cache = LRUCache(db_cache_size)
 
-    def get_doc(self, _id):
+    def get_doc(self, snowflake):
+        # Default to 0 if the snowflake doesn't exist (i.e. ctx.guild in a PrivateChannel)
+        _id = snowflake.id if hasattr(snowflake, "id") else 0
         if _id in self.doc_cache:
             doc = self.doc_cache[_id]
         else:
@@ -37,9 +39,9 @@ class OnaDB:
             self.collection.insert_one({"_id": doc["_id"]})
 
     @contextmanager
-    def doc_context(self, _id):
+    def doc_context(self, snowflake):
         '''Incorporate get_doc and update_doc as a single contextmanager.'''
-        doc = self.get_doc(_id)
+        doc = self.get_doc(snowflake)
         yield doc
         self.update_doc(doc)
 

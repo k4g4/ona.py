@@ -1,8 +1,8 @@
+import discord
 from datetime import datetime
 from discord.ext import commands
 from .db import OnaDB
 from .config_parser import OnaConfigParser
-from .help_formatter import OnaHelpFormatter
 from .utils import OnaUtilsMixin, not_blacklisted, not_silenced
 
 __author__ = 'kaga'
@@ -17,14 +17,14 @@ class Ona(commands.Bot, OnaUtilsMixin):
         self.uptime = datetime.utcnow()
         (self.config, self.secrets,
          self.guild_template, self.user_template) = map(OnaConfigParser, config_files)
-        formatter = OnaHelpFormatter(self, width=self.config.help_width)
 
-        def get_prefix(ona, message):   # The prefix is chosen depending on the server's settings
-            return ona.guild_db.get_doc(message.guild.id if message.guild else 0).prefix
-        super().__init__(command_prefix=get_prefix, formatter=formatter)
+        def get_prefix(ona, message):
+            return ona.guild_db.get_doc(message.guild).prefix   # The prefix is chosen based on the server's settings
+
+        activity = discord.Activity(type=discord.ActivityType.listening, name=self.config.activity)
+        super().__init__(command_prefix=get_prefix, activity=activity)
 
         self.add_command(self.reload)
-        self.remove_command("help")
         self.add_check(not_blacklisted)
         self.add_check(not_silenced)
 
@@ -35,7 +35,9 @@ class Ona(commands.Bot, OnaUtilsMixin):
                 print(e)
 
     async def process_commands(self, message):
-        await self.invoke(await self.get_context(message, cls=self.OnaContext))
+        ctx = await self.get_context(message, cls=self.OnaContext)
+        await self.invoke(ctx)
+        return ctx if ctx.valid else None   # For use in on_message if needed
 
     @commands.command()
     @commands.is_owner()
@@ -52,6 +54,9 @@ class Ona(commands.Bot, OnaUtilsMixin):
         else:
             print("Reload completed successfully.")
             await ctx.clean_up(await ctx.send("All commands were reloaded successfully."))
+
+    async def on_message(self, message):
+        pass    # Override the call to process_commands, we'll call it in the Events cog instead
 
     def run(self):
         super().run(self.secrets.token)

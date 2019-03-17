@@ -2,7 +2,7 @@ import asyncio
 import discord
 from discord.ext import commands
 
-event = commands.Cog.listener()
+event = commands.Cog.listener
 
 
 class Events(commands.Cog):
@@ -11,27 +11,30 @@ class Events(commands.Cog):
     def __init__(self, ona):
         self.ona = ona
 
-    @event
+    @event()
     async def on_ready(self):
-        listening = discord.ActivityType.listening
-        listening_to_help = discord.Activity(type=listening, name=f"{self.ona.guild_db.get_doc(0).prefix}help")
-        await self.ona.change_presence(activity=listening_to_help)
         content = "Ona has logged in."
         print(content)
         await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), content)
 
-    @event
+    @event()
     async def on_message(self, message):
         if message.author.bot:
             return
+        ctx = await self.ona.process_commands(message)
 
-    @event
+    @event()
     async def on_message_edit(self, before, after):
         if after.author.bot:
             return
         await self.ona.process_commands(after)
 
-    @event
+    @event()
+    async def on_message_delete(self, message):
+        if message.author.bot:
+            return
+
+    @event()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
             error = error.original
@@ -55,8 +58,9 @@ class Events(commands.Cog):
         elif isinstance(error, self.ona.OnaError):
             error_text = str(error)
         else:
-            print(error)
-            await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), f"Error: {error}")
+            error_text = f"{type(error).__name__}: {error} (line #{error.__traceback__.tb_next.tb_lineno})"
+            print(error_text)
+            await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), error_text)
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))
 
