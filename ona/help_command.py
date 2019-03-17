@@ -31,11 +31,9 @@ class OnaHelpCommand(commands.HelpCommand):
             return command.cog.qualified_name if command.cog else "\u200bNo Category"
 
         def command_format(command):
-            if not command.short_doc:
-                return no_desc
             width = 47
-            desc = f"{command.short_doc[:width]}..." if len(command.short_doc) > width else command.short_doc
-            return f"**{command.name}**: {desc}"
+            desc = command.short_doc or no_desc
+            return f"**{command.name}**: {desc[:width] + '...' if len(desc) > width else desc}"
 
         to_iterate = groupby(await self.filter_commands(ona.commands, sort=True, key=get_cog_name), key=get_cog_name)
         for cog_name, commands in to_iterate:

@@ -1,7 +1,8 @@
+import random
 import discord
 from io import BytesIO
 from discord.ext import commands
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 
 class Fun(commands.Cog):
@@ -9,6 +10,32 @@ class Fun(commands.Cog):
 
     def __init__(self, ona):
         self.ona = ona
+
+    @commands.command()
+    async def ask(self, ctx):
+        '''Ask a yes or no question.'''
+        await ctx.send(random.choice(self.ona.config.replies))
+
+    @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.channel)
+    async def ship(self, ctx, *members: discord.Member):
+        '''Create a ship between two (or more) members.'''
+        members = members or [(await ctx.history(before=ctx.message).next()).author]
+        members = [*members, ctx.author] if len(members) == 1 else members
+        self.ona.assert_(len(members) <= 10, error="That ship is too big!")
+        ship_name = "".join(name[i * (len(name) // len(members)): (i+1) * -(-len(name) // len(members))]
+                            for i, name in enumerate(member.display_name for member in members))
+        avatar_size = 128
+        image = Image.new("RGBA", (len(members) * avatar_size, avatar_size))
+        urls = (member.avatar_url_as(static_format="png", size=avatar_size) for member in members)
+        avatars = map(Image.open, map(BytesIO, [await self.ona.request(url) for url in urls]))
+        for i, avatar in enumerate(avatars):
+            image.alpha_composite(avatar.convert(mode="RGBA"), dest=(avatar_size * i, 0))
+        ship_image = BytesIO()
+        image.save(ship_image, format="PNG")
+        ship_image.seek(0)
+        await ctx.send(f"Your ship's name is **{ship_name}!** {self.ona.config.heart_eyes}",
+                       file=discord.File(ship_image, f"{ctx.message.id}.png"))
 
     @commands.command()
     @commands.cooldown(1, 5, commands.BucketType.channel)
@@ -22,13 +49,13 @@ class Fun(commands.Cog):
             raise self.ona.OnaError(f"That filter isn't recognized. Use `{ctx.prefix}help filter` to see all filters.")
         url = url or await ctx.get_attachment()
         image = Image.open(BytesIO(await self.ona.request(url)))
-        blurred_image = BytesIO()
+        filtered_image = BytesIO()
         try:
-            image.filter(filter).save(blurred_image, format="PNG")
+            image.filter(filter).save(filtered_image, format="PNG")
         except ValueError:
             raise self.ona.OnaError("That image format is not accepted.")
-        blurred_image.seek(0)
-        await ctx.send(file=discord.File(blurred_image, self.ona.filename_from_url(url)))
+        filtered_image.seek(0)
+        await ctx.send(file=discord.File(filtered_image, self.ona.filename_from_url(url)))
 
 
 def setup(ona):
