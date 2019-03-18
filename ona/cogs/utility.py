@@ -47,7 +47,7 @@ class Utility(commands.Cog):
                   ("Static Emotes", f"{len([str(emoji) for emoji in ctx.guild.emojis if not emoji.animated])} / 50"),
                   ("Animated Emotes", f"{len([str(emoji) for emoji in ctx.guild.emojis if emoji.animated])} / 50")]
         thumbnail = ctx.guild.icon_url_as(format="png")
-        embed = self.ona.quick_embed(title=ctx.guild.name, thumbnail=thumbnail, fields=fields)
+        embed = self.ona.embed(title=ctx.guild.name, thumbnail=thumbnail, fields=fields)
         await ctx.send(embed=embed)
 
     @commands.command(aliases=["avi", "pfp"])
@@ -78,7 +78,7 @@ class Utility(commands.Cog):
             else:
                 fields.append((member.activity.type.name.title(), member.activity.name))
         avatar = member.avatar_url_as(static_format="png")
-        embed = self.ona.quick_embed(title=member.display_name, thumbnail=avatar, fields=fields)
+        embed = self.ona.embed(title=member.display_name, thumbnail=avatar, fields=fields)
         if member.color.value:
             embed.color = member.color
         await ctx.send(embed=embed)
@@ -95,37 +95,37 @@ class Utility(commands.Cog):
         position = f"{current.seconds//60}:{current.seconds%60} / {duration.seconds//60}:{duration.seconds%60}"
         fields.append(("Song Position", position))
         thumbnail = spotify.album_cover_url
-        embed = self.ona.quick_embed(title=spotify.title, thumbnail=thumbnail, author=member, fields=fields)
+        embed = self.ona.embed(title=spotify.title, thumbnail=thumbnail, author=member, fields=fields)
         await ctx.send(embed=embed)
 
     @commands.command(aliases=["search", "g"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def google(self, ctx, *, query: str):
+    async def google(self, ctx, *, query):
         '''Search for anything on Google.'''
         query = query or await ctx.ask("Give a word or phrase to search:")
         fields = [(result["title"], result["link"]) for result in await self.ona.google_search(query)]
         embeds = []
         per_page = 5
         for i in range(0, len(fields), per_page):
-            embed = self.ona.quick_embed(title="Search Results", author=ctx.author, fields=fields[i:i+per_page])
+            embed = self.ona.embed(title="Search Results", author=ctx.author, fields=fields[i:i+per_page])
             embeds.append(embed.set_thumbnail(url="https://i.imgur.com/oRN5hP2.png"))
         await ctx.embed_browser(embeds)
 
     @commands.command(aliases=["img", "image"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def imagesearch(self, ctx, *, query: str):
+    async def imagesearch(self, ctx, *, query):
         '''Search for any image using Google.'''
         query = query or await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(query, image=True)
         embeds = []
         for result in results:
-            embed = self.ona.quick_embed(result["title"], title="Search Results", author=ctx.author)
+            embed = self.ona.embed(result["title"], title="Search Results", author=ctx.author)
             embeds.append(embed.set_image(url=result["link"]))
         await ctx.embed_browser(embeds)
 
     @commands.command(aliases=["yt"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def youtube(self, ctx, *, query: str):
+    async def youtube(self, ctx, *, query):
         '''Search for a video on YouTube.'''
         query = query if query else await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(f"youtube {query}")
@@ -133,7 +133,7 @@ class Utility(commands.Cog):
 
     @commands.command()
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def define(self, ctx, *, query: str):
+    async def define(self, ctx, *, query):
         '''Find the definition for a word or phrase.'''
         query = query or await ctx.ask("Give a word or phrase to define:")
         search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
@@ -152,12 +152,12 @@ class Utility(commands.Cog):
         pages = [(lex_entry["lexicalCategory"], combine_defs(lex_entry)) for lex_entry in lex_entries]
         embeds = []
         for page in pages:
-            embed = self.ona.quick_embed(title=f"{query.title()} - {page[0]}", author=ctx.author, fields=page[1])
+            embed = self.ona.embed(title=f"{query.title()} - {page[0]}", author=ctx.author, fields=page[1])
             embeds.append(embed.set_thumbnail(url="https://i.imgur.com/hd60hLe.png"))
         await ctx.embed_browser(embeds)
 
     @commands.command()
-    async def osu(self, ctx, *, username: str):
+    async def osu(self, ctx, *, username):
         '''Search for an osu! profile.
         Provide either an osu! username or user id.'''
         username = username or await ctx.ask("Give a username to search for:")
@@ -178,13 +178,13 @@ class Utility(commands.Cog):
             ("Playcount", f"{osu_user['playcount']:,}"),
             ("Ranked Score", f"{osu_user['ranked_score']:,}")
         ]
-        embed = self.ona.quick_embed(title=f"{osu_user['username']}'s Stats", url=url, fields=stats)
+        embed = self.ona.embed(title=f"{osu_user['username']}'s Stats", url=url, fields=stats)
         embed.set_thumbnail(url=f"https://a.ppy.sh/{osu_user['user_id']}")
         await ctx.send(embed=embed)
 
     @commands.command(aliases=["sauce"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def source(self, ctx, url: str = None):
+    async def source(self, ctx, url=None):
         '''Perform a reverse image search using iqdb.org.'''
         url = url or await ctx.get_attachment()
         body = (await self.ona.request("http://iqdb.org", method="POST", data={"url": url})).decode()

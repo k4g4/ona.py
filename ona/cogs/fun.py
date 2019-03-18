@@ -21,16 +21,16 @@ class Fun(commands.Cog):
     async def ship(self, ctx, *members: discord.Member):
         '''Create a ship between two (or more) members.'''
         members = members or [(await ctx.history(before=ctx.message).next()).author]
-        members = [*members, ctx.author] if len(members) == 1 else members
+        members = [*members, ctx.author] if len(members) == 1 else members  # Include the author if only one member
         self.ona.assert_(len(members) <= 10, error="That ship is too big!")
         ship_name = "".join(name[i * (len(name) // len(members)): (i+1) * -(-len(name) // len(members))]
-                            for i, name in enumerate(member.display_name for member in members))
+                            for i, name in enumerate(member.display_name for member in members))    # Combine names
         avatar_size = 128
         image = Image.new("RGBA", (len(members) * avatar_size, avatar_size))
         urls = (member.avatar_url_as(static_format="png", size=avatar_size) for member in members)
         avatars = map(Image.open, map(BytesIO, [await self.ona.request(url) for url in urls]))
         for i, avatar in enumerate(avatars):
-            image.alpha_composite(avatar.convert(mode="RGBA"), dest=(avatar_size * i, 0))
+            image.alpha_composite(avatar.convert(mode="RGBA"), dest=(avatar_size * i, 0))   # Combine avatars
         ship_image = BytesIO()
         image.save(ship_image, format="PNG")
         ship_image.seek(0)
@@ -39,7 +39,7 @@ class Fun(commands.Cog):
 
     @commands.command()
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def filter(self, ctx, filter: str = "blur", url: str = None):
+    async def filter(self, ctx, filter="blur", url=None):
         '''Apply a filter to an image.
         The available filters are: blur, contour, detail, edge_enhance, edge_enhance_more, emboss,
         find_edges, sharpen, smooth, and smooth_more.'''

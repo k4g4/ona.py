@@ -15,7 +15,9 @@ class Events(commands.Cog):
     async def on_ready(self):
         content = "Ona has logged in."
         print(content)
-        await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), content)
+        embed = self.ona.embed(content, timestamp=True, author=self.ona.user)
+        logs = self.ona.guild_db.get_doc(self.ona.config.main_guild).logs
+        await guild.get_channel(logs).send(embed=embed)
 
     @event()
     async def on_message(self, message):
@@ -24,15 +26,30 @@ class Events(commands.Cog):
         ctx = await self.ona.process_commands(message)
 
     @event()
-    async def on_message_edit(self, before, after):
-        if after.author.bot:
+    async def on_message_edit(self, initial, message):
+        if message.author.bot:
             return
-        await self.ona.process_commands(after)
+        await self.ona.process_commands(message)
+        if not message.guild:     # Assume we're in a guild after this point
+            return
+        logs = self.ona.guild_db.get_doc(message.guild).logs
+        if not logs:     # Do nothing when a guild has no logs setting specified
+            return
+        fields = [("Before", initial.content), ("After", message.content), ("Channel", message.channel.mention)]
+        embed = self.ona.embed(title="Message was edited", timestamp=True, author=message.author, fields=fields)
+        await message.guild.get_channel(logs).send(embed=embed)
 
     @event()
     async def on_message_delete(self, message):
         if message.author.bot:
             return
+        if not message.guild:   # Assum we're in a guild after this point
+            return
+        logs = self.ona.guild_db.get_doc(message.guild).logs
+        if not logs:     # Do nothing when a guild has no logs setting specified, or in a PrivateChannel
+            return
+        embed = self.ona.embed(message.content, title="Message was deleted", timestamp=True, author=message.author)
+        await message.guild.get_channel(logs).send(embed=embed)
 
     @event()
     async def on_command_error(self, ctx, error):

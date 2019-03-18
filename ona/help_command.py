@@ -10,7 +10,7 @@ class OnaHelpCommand(commands.HelpCommand):
 
     async def prepare_help_command(self, ctx, command=None):
         self.context = ctx
-        self.help_embed = ctx.ona.quick_embed(title=ctx.me.name)
+        self.help_embed = ctx.ona.embed(title=ctx.me.name)
         self.help_embed.set_thumbnail(url=ctx.me.avatar_url)
 
     async def send_command_help(self, command):

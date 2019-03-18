@@ -32,17 +32,6 @@ class OnaContext(commands.Context):
     def member_doc_ctx(self, member):
         return self.ona.user_db.doc_context(member)
 
-    def get_role_named(self, name):
-        '''Return a role in the context's guild if it exists, otherwise None.'''
-        if self.guild:
-            return self.ona.get(self.guild.roles, name=name)
-
-    def has_role(self, role_id):
-        return any(role.id == role_id for role in self.author.roles)
-
-    def has_any_role(self, role_ids):
-        return any(role.id in role_ids for role in self.author.roles)
-
     async def send(self, content="", *, multi=False, url=None, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
         Discord character limit as well as the ability to upload an image from any url.'''
@@ -143,6 +132,14 @@ class OnaContext(commands.Context):
         if self.guild:
             await self.send(f"{self.author.mention} Check your DM!")
         return message
+
+    async def staff_log(self, content="", *, fields=[]):
+        '''If this setting is provided, it will log staff commands to the specified channel.'''
+        logs = self.guild_doc.staff_logs
+        if not logs:     # Do nothing when a guild has no staff_logs setting specified, or in a PrivateChannel
+            return
+        embed = self.ona.embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
+        await self.guild.get_channel(logs).send(embed=embed)
 
     async def get_attachment(self):
         '''For commands that require a file attachment, first check if the user attached a file.

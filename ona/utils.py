@@ -21,7 +21,7 @@ class OnaUtilsMixin:
     def get(self, iterable, **attrs):
         return discord.utils.get(iterable, **attrs)
 
-    def quick_embed(self, content="", *, title=None, timestamp=False, thumbnail=None, author=None, fields=[]):
+    def embed(self, content="", *, title=None, timestamp=False, thumbnail=None, author=None, fields=[]):
         '''An embed factory method.'''
         embed = discord.Embed(description=str(content), title=title, color=self.config.ona_color)
         if thumbnail:
@@ -50,15 +50,6 @@ class OnaUtilsMixin:
             params["searchType"] = "image"
         return (await self.request("https://www.googleapis.com/customsearch/v1", params=params))["items"]
 
-    async def log(self, guild, content, *, fields=[], staff=False):
-        title = "Staff Logger" if staff else "Ona Logger"
-        embed = self.quick_embed(content, title=title, timestamp=True, fields=fields)
-        log_channel = self.guild_db.get_doc(guild)["staff_logs" if staff else "logs"]
-        try:
-            await guild.get_channel(log_channel).send(embed=embed)
-        except AttributeError:  # Ignore cases where a guild has no logs/staff_logs setting specified
-            pass
-
     @staticmethod
     def plural(value, word):
         value = int(value) if float(value).is_integer() else value  # Remove .0 if it exists
@@ -67,6 +58,10 @@ class OnaUtilsMixin:
     @staticmethod
     def filename_from_url(url):
         return url.split("/")[-1].split("?")[0]
+
+    @staticmethod
+    def ordinal(n):
+        return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th") if n % 100 < 10 or 20 < n % 100 else "th"
 
 
 # Various command checks
@@ -79,10 +74,10 @@ def not_blacklisted(ctx):
 def not_silenced(ctx):
     if ctx.channel.id not in ctx.guild_doc.chat_throttle:
         return True
-    ctx.ona.assert_(not ctx.guild or not ctx.has_role(ctx.guild_doc.silenced),
-                    error="You've been silenced. Use a bot channel instead.")
-    return ctx.ona.assert_(not ctx.guild or all(role.id != ctx.guild_doc.silenced for role in ctx.guild.me.roles),
-                           error="I'm on silent mode. Try again later!")
+    ctx.ona.assert_(not ctx.guild or ctx.author.id not in ctx.guild_doc.silenced,
+                    error="You've been silenced. Try another channel instead.")
+    return ctx.ona.assert_(not ctx.guild or not ctx.guild_doc.silent,
+                           error="Silent mode is currently enabled. Try again later!")
 
 
 # This check ignores all channels not on the image_throttle list
