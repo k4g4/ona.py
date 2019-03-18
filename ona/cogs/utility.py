@@ -139,7 +139,7 @@ class Utility(commands.Cog):
         search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
         headers = {"app_id": self.ona.secrets.oxford_id, "app_key": self.ona.secrets.oxford_key}
         params = {"q": query, "limit": 1}
-        results = self.ona.request(search_url, params=params, headers=headers)["results"]
+        results = (await self.ona.request(search_url, params=params, headers=headers))["results"]
         self.ona.assert_(len(results), error=f"'{query}' is not an English word.")
         entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + results[0]["id"].lower()
         lex_entries = self.ona.request(entry_url, headers=headers)["results"][0]["lexicalEntries"]

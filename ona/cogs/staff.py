@@ -47,7 +47,7 @@ class Staff(commands.Cog):
         After the list of members, a number may be given to mute for a certain number of minutes.'''
         self.ona.assert_(members, error="Give one or more members to mute.")
         self.ona.assert_(minutes is None or 0 < minutes < self.ona.config.max_minutes,
-                         error=f"The number of minutes must positive and less than {self.ona.config.max_minutes}")
+                         error=f"The number of minutes must positive and fewer than {self.ona.config.max_minutes}")
         muted = ctx.guild.get_role(ctx.guild_doc.muted)
         self.ona.assert_(muted, error="No `Muted` role has been set in this server.")
         await ctx.message.delete()
@@ -163,7 +163,7 @@ class Staff(commands.Cog):
         '''Prune multiple messages from a channel.
         If a member is provided, only that member's messages are removed out of the number of messages given.'''
         self.ona.assert_(0 < count < self.ona.config.max_prune,
-                         error=f"The number of messages must be positive and less than {self.ona.config.max_prune}.")
+                         error=f"The number of messages must be positive and fewer than {self.ona.config.max_prune}.")
         await ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
         await ctx.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
@@ -195,7 +195,7 @@ class Staff(commands.Cog):
         For a full list of settings, use the `settings` command.'''
         setting = setting or await ctx.ask("Which setting would you like to edit?")
         self.ona.assert_(setting in self.ona.guild_db.template,
-                         error="That isn't a valid setting. Use `{ctx.guild_doc.prefix}settings` to see all settings.")
+                         error=f"That isn't a valid setting. Use `{ctx.guild_doc.prefix}settings` to see all settings.")
         with ctx.guild_doc_ctx() as guild_doc:
             content = f"Give the new value for `{setting}`:"
             if setting in guild_doc:
@@ -208,6 +208,15 @@ class Staff(commands.Cog):
         content = f"`{setting}` is now set to `{ctx.guild_doc[setting]}`."
         await ctx.staff_log(content)
         await ctx.clean_up(await ctx.send(content))
+
+    @commands.command()
+    @commands.has_permissions(manage_guild=True)
+    async def invites(self, ctx):
+        '''Check invites in the server.'''
+        invites = await ctx.guild.invites()
+        await ctx.send("All invites:\n" + ", ".join(f"{invite.inviter.name}: {invite.uses} uses"
+                                                    for invite in sorted(invites, key=lambda i: i.uses, reverse=True)
+                                                    if invite.uses > 0))
 
     @commands.command(aliases=["shutdown"])
     @commands.is_owner()

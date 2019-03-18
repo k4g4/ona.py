@@ -77,7 +77,9 @@ class Events(commands.Cog):
         else:
             error_text = f"{type(error).__name__}: {error} (line #{error.__traceback__.tb_next.tb_lineno})"
             print(error_text)
-            await self.ona.log(self.ona.get_guild(self.ona.config.main_guild), error_text)
+            embed = self.ona.embed(error_text, timestamp=True, author=self.ona.user)
+            main_guild = self.ona.get_guild(self.ona.config.main_guild)
+            await main_guild.get_channel(self.ona.guild_db.get_doc(main_guild).logs).send(embed=embed)
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))
 

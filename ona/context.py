@@ -73,7 +73,6 @@ class OnaContext(commands.Context):
             if m.author != self.author:
                 return False
             return not options or m.content.isdigit() and int(m.content) <= len(options)
-
         try:
             timeout = self.ona.config.response_timeout
             response = await self.ona.wait_for("message", timeout=timeout, check=check)
@@ -89,7 +88,6 @@ class OnaContext(commands.Context):
         '''Send a list of embeds to display each one along with reaction based controls to navigate through
         them. The pos parameter decides which embed should be shown first.'''
         can_remove_reacts = self.guild and self.channel.permissions_for(self.me).manage_messages
-
         for i, embed in enumerate(embeds, 1):   # Add page numbers to each embed
             embed.set_footer(text=f"Page {i} of {len(embeds)}")
         message = await self.send(embed=embeds[pos])
@@ -97,8 +95,9 @@ class OnaContext(commands.Context):
         await message.add_reaction("➡")
 
         def check(r, u):
+            if u != self.author:
+                return False
             return r.message.id == message.id and not u.bot and r.emoji in "⬅➡"
-
         while True:
             try:
                 timeout = self.ona.config.response_timeout

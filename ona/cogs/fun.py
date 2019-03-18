@@ -20,7 +20,7 @@ class Fun(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def ship(self, ctx, *members: discord.Member):
         '''Create a ship between two (or more) members.'''
-        members = members or [(await ctx.history(before=ctx.message).next()).author]
+        members = members or [(await ctx.history().find(lambda m: m.author not in [ctx.author, ctx.me])).author]
         members = [*members, ctx.author] if len(members) == 1 else members  # Include the author if only one member
         self.ona.assert_(len(members) <= 10, error="That ship is too big!")
         ship_name = "".join(name[i * (len(name) // len(members)): (i+1) * -(-len(name) // len(members))]

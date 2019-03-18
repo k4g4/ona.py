@@ -32,7 +32,7 @@ class Ona(commands.Bot, OnaUtilsMixin):
             try:
                 self.load_extension(extension)
             except Exception as e:
-                print(e)
+                print(f"{type(e).__name__}: {e} (line #{e.__traceback__.tb_next.tb_lineno})")
 
     async def process_commands(self, message):
         ctx = await self.get_context(message, cls=self.OnaContext)

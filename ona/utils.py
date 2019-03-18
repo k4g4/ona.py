@@ -23,7 +23,7 @@ class OnaUtilsMixin:
 
     def embed(self, content="", *, title=None, timestamp=False, thumbnail=None, author=None, fields=[]):
         '''An embed factory method.'''
-        embed = discord.Embed(description=str(content), title=title, color=self.config.ona_color)
+        embed = discord.Embed(description=str(content), title=title, color=int(self.config.ona_color, 16))
         if thumbnail:
             embed.set_thumbnail(url=thumbnail)
         if timestamp:
