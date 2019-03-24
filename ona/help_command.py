@@ -21,7 +21,7 @@ class OnaHelpCommand(commands.HelpCommand):
             value = (f"{self.context.ona.plural(cd.rate, 'time').capitalize()} "
                      f"every {self.context.ona.plural(cd.per, 'second')}.")
             self.help_embed.add_field(name="Cooldown", value=value)
-        await self.context.send(embed=self.help_embed)
+        return await self.context.send(embed=self.help_embed)
 
     async def send_bot_help(self, mapping):
         ona = self.context.ona
@@ -41,7 +41,7 @@ class OnaHelpCommand(commands.HelpCommand):
             self.help_embed.add_field(name=cog_name, value=formatted_commands)
 
         self.help_embed.set_footer(text=f"Use {self.clean_prefix}help [command] for details on any command.")
-        await self.context.whisper(embed=self.help_embed)
+        return await self.context.whisper(embed=self.help_embed)
 
 
 def setup(ona):

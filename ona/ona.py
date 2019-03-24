@@ -1,3 +1,4 @@
+import os
 import discord
 from datetime import datetime
 from discord.ext import commands
@@ -7,7 +8,7 @@ from .utils import OnaUtilsMixin, not_blacklisted, not_silenced
 
 __author__ = 'kaga'
 
-config_files = ["config.ini", "secrets.ini", "guild.ini", "user.ini"]
+dir = os.path.dirname(os.path.realpath(__file__))
 
 
 class Ona(commands.Bot, OnaUtilsMixin):
@@ -15,8 +16,13 @@ class Ona(commands.Bot, OnaUtilsMixin):
 
     def __init__(self):
         self.uptime = datetime.utcnow()
-        (self.config, self.secrets,
-         self.guild_template, self.user_template) = map(OnaConfigParser, config_files)
+        # Configs are stored as attributes
+        for filename in os.listdir(os.path.join(dir, "config")):
+            setattr(self, os.path.splitext(filename)[0], OnaConfigParser(os.path.join(dir, "config", filename)))
+        # Resources, such as images and fonts, have file paths stored in a dict
+        self.resources = {}
+        for filename in os.listdir(os.path.join(dir, "resources")):
+            self.resources[os.path.splitext(filename)[0]] = os.path.join(dir, "resources", filename)
 
         def get_prefix(ona, message):
             return ona.guild_db.get_doc(message.guild).prefix   # The prefix is chosen based on the server's settings
@@ -43,17 +49,19 @@ class Ona(commands.Bot, OnaUtilsMixin):
     @commands.is_owner()
     async def reload(ctx):
         '''Update code, reload config settings, and refresh all cooldowns.'''
-        (ctx.ona.config, ctx.ona.secrets,
-         ctx.ona.guild_template, ctx.ona.user_template) = map(OnaConfigParser, config_files)
+        for filename in os.listdir(os.path.join(dir, "config")):
+            setattr(ctx.ona, os.path.splitext(filename)[0], OnaConfigParser(os.path.join(dir, "config", filename)))
+        ctx.ona.resources = {}
+        for filename in os.listdir(os.path.join(dir, "resources")):
+            ctx.ona.resources[os.path.splitext(filename)[0]] = os.path.join(dir, "resources", filename)
         try:
             for extension in ctx.ona.config.extensions:
-                ctx.ona.unload_extension(extension)
-                ctx.ona.load_extension(extension)
+                ctx.ona.reload_extension(extension)
         except Exception as e:
             raise ctx.ona.OnaError(f"Error in {extension}: {e}")
         else:
             print("Reload completed successfully.")
-            await ctx.clean_up(await ctx.send("All commands were reloaded successfully."))
+            await ctx.send("All commands were reloaded successfully.")
 
     async def on_message(self, message):
         pass    # Override the call to process_commands, we'll call it in the Events cog instead

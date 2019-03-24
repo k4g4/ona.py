@@ -102,7 +102,7 @@ class Staff(commands.Cog):
             content += f"\n{self.ona.plural(len(failures), 'member')} could not be unmuted. Check the role hierarchy."
         await ctx.staff_log(content, fields=[("Reason", reason)] if reason else [])
 
-    @commands.commland(aliases=["silent"])
+    @commands.command(aliases=["silent"])
     @commands.has_permissions(manage_messages=True)
     async def silence(self, ctx, members: commands.Greedy[discord.Member], minutes: int = None):
         '''Turn on silent mode, or silence any number of members.
@@ -229,14 +229,14 @@ class Staff(commands.Cog):
         else:
             await ctx.send("Shutdown aborted.")
 
-    @commands.command(pass_context=True, aliases=['editavi'])
+    @commands.command(aliases=["editavi"])
     @commands.is_owner()
     async def editavatar(self, ctx, url=None):
         '''Change Ona's avatar.'''
         await self.ona.user.edit(avatar=await self.ona.request(url or await ctx.get_attachment()))
         content = "My avatar has been updated."
         await ctx.staff_log(content)
-        await ctx.clean_up(await ctx.send(content))
+        await ctx.send(content)
 
     @commands.command(name="eval")
     @commands.is_owner()
@@ -253,7 +253,7 @@ class Staff(commands.Cog):
         '''Give or remove money from a user.'''
         with ctx.member_doc_ctx(member) as member_doc:
             member_doc.money += money
-        content = f"{member.display_name} {'gained' if money >= 0 else 'lost'} {money} {ctx.guild_doc.currency}."
+        content = f"{member.display_name} {'gained' if money >= 0 else 'lost'} {abs(money)} {ctx.guild_doc.currency}."
         await ctx.staff_log(content)
         await ctx.send(content)
 

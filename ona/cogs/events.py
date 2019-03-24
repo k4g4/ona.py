@@ -16,8 +16,8 @@ class Events(commands.Cog):
         content = "Ona has logged in."
         print(content)
         embed = self.ona.embed(content, timestamp=True, author=self.ona.user)
-        logs = self.ona.guild_db.get_doc(self.ona.config.main_guild).logs
-        await guild.get_channel(logs).send(embed=embed)
+        main_guild = self.ona.get_guild(self.ona.config.main_guild)
+        await main_guild.get_channel(self.ona.guild_db.get_doc(main_guild).logs).send(embed=embed)
 
     @event()
     async def on_message(self, message):
@@ -49,7 +49,17 @@ class Events(commands.Cog):
         if not logs:     # Do nothing when a guild has no logs setting specified, or in a PrivateChannel
             return
         embed = self.ona.embed(message.content, title="Message was deleted", timestamp=True, author=message.author)
+        if message.attachments:
+            embed.set_image(url=message.attachments[0].proxy_url)
+            embed.add_field(name="Filename", value=message.attachments[0].filename)
         await message.guild.get_channel(logs).send(embed=embed)
+
+    @event()
+    async def on_member_update(self, initial, member):
+        if initial.roles == member.roles:
+            return
+        with self.ona.guild_db.doc_context(member.guild) as guild_doc:
+            guild_doc.member_roles[str(member.id)] = [role.id for role in member.roles[1:]]  # First role is @everyone
 
     @event()
     async def on_command_error(self, ctx, error):
@@ -82,6 +92,14 @@ class Events(commands.Cog):
             await main_guild.get_channel(self.ona.guild_db.get_doc(main_guild).logs).send(embed=embed)
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))
+
+    @event()
+    async def on_error(self, error):
+        error_text = f"{type(error).__name__}: {error} (line #{error.__traceback__.tb_next.tb_lineno})"
+        print(error_text)
+        embed = self.ona.embed(error_text, timestamp=True, author=self.ona.user)
+        main_guild = self.ona.get_guild(self.ona.config.main_guild)
+        await main_guild.get_channel(self.ona.guild_db.get_doc(main_guild).logs).send(embed=embed)
 
 
 def setup(ona):

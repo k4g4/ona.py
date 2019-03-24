@@ -6,8 +6,7 @@ from configparser import ConfigParser
 class OnaConfigParser:
     def __init__(self, filename):
         self.parser = ConfigParser()
-        dir = path.dirname(path.realpath(__file__))
-        self.parser.read(path.join(dir, "config", filename))
+        self.parser.read(filename)
 
     def __getattr__(self, key):
         try:

@@ -61,7 +61,7 @@ class OnaUtilsMixin:
 
     @staticmethod
     def ordinal(n):
-        return str(n) + {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th") if n % 100 < 10 or 20 < n % 100 else "th"
+        return str(n) + ({1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th") if n % 100 < 10 or 20 < n % 100 else "th")
 
 
 # Various command checks
@@ -72,12 +72,12 @@ def not_blacklisted(ctx):
 
 
 def not_silenced(ctx):
+    ctx.ona.assert_(not ctx.guild or ctx.author.id not in ctx.guild_doc.silenced,
+                    error="You've been silenced in this server.")
     if ctx.channel.id not in ctx.guild_doc.chat_throttle:
         return True
-    ctx.ona.assert_(not ctx.guild or ctx.author.id not in ctx.guild_doc.silenced,
-                    error="You've been silenced. Try another channel instead.")
     return ctx.ona.assert_(not ctx.guild or not ctx.guild_doc.silent,
-                           error="Silent mode is currently enabled. Try again later!")
+                           error="Silent mode is currently enabled. Try another channel instead.")
 
 
 # This check ignores all channels not on the image_throttle list
