@@ -54,7 +54,7 @@ class Utility(commands.Cog):
     async def avatar(self, ctx, member: discord.Member = None):
         '''Display a user's avatar.'''
         member = member or ctx.author
-        await ctx.send(f"{member.display_name}'s avatar:", url=member.avatar_url_as(static_format="png", size=256))
+        await ctx.send(url=member.avatar_url_as(static_format="png", size=256))
 
     @commands.command(aliases=["emoji", "e"])
     async def emote(self, ctx, emoji: discord.PartialEmoji):

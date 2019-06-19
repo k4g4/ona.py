@@ -6,7 +6,7 @@ from .db import OnaDB
 from .config_parser import OnaConfigParser
 from .utils import OnaUtilsMixin, not_blacklisted, not_silenced
 
-__author__ = 'kaga'
+__author__ = "kaga"
 
 dir = os.path.dirname(os.path.realpath(__file__))
 

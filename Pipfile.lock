@@ -40,7 +40,7 @@
         },
         "discord-py": {
             "git": "https://github.com/Rapptz/discord.py.git",
-            "ref": "b41a29a8897c5936d022a741e923353c0a26e9e8"
+            "ref": "dea3ba5eb7c99f54c72b11f3e3f7b8f41649e779"
         },
         "discord.py": {
             "git": "https://github.com/Rapptz/discord.py.git",

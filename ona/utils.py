@@ -72,7 +72,9 @@ def not_blacklisted(ctx):
 
 
 def not_silenced(ctx):
-    ctx.ona.assert_(not ctx.guild or ctx.author.id not in ctx.guild_doc.silenced,
+    if ctx.channel.permissions_for(ctx.author).manage_messages:
+        return True
+    ctx.ona.assert_(not ctx.guild or ctx.guild.id not in ctx.author_doc.silenced,
                     error="You've been silenced in this server.")
     if ctx.channel.id not in ctx.guild_doc.chat_throttle:
         return True

@@ -97,7 +97,7 @@ class OnaContext(commands.Context):
         def check(r, u):
             if u != self.author:
                 return False
-            return r.message.id == message.id and not u.bot and r.emoji in "⬅➡"
+            return r.message.id == message.id and not u.bot and not r.custom_emoji and r.emoji in "⬅➡"
         while True:
             try:
                 timeout = self.ona.config.response_timeout

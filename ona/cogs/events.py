@@ -58,8 +58,8 @@ class Events(commands.Cog):
     async def on_member_update(self, initial, member):
         if initial.roles == member.roles:
             return
-        with self.ona.guild_db.doc_context(member.guild) as guild_doc:
-            guild_doc.member_roles[str(member.id)] = [role.id for role in member.roles[1:]]  # First role is @everyone
+        with self.ona.user_db.doc_context(member) as member_doc:
+            member_doc.roles[str(member.guild.id)] = [role.id for role in member.roles[1:]]  # First role is @everyone
 
     @event()
     async def on_command_error(self, ctx, error):

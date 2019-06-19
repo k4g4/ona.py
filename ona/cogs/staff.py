@@ -109,31 +109,34 @@ class Staff(commands.Cog):
         Silent mode will ignore commands in channels listed on the chat_throttle list.
         A number may be given to keep silent mode off for a certain number of minutes.'''
         for_n_minutes = f" for {self.ona.plural(minutes, 'minute')}" if minutes else ""
-        with ctx.guld_doc_ctx() as guild_doc:
-            if members:
-                guild_doc.silenced += members
-                content = (f"{members[0].display_name if len(members) == 1 else f'{len(members)} members'} "
-                           f"may no longer use commands{for_n_minutes}.")
-            else:
+        if members:
+            for member in members:
+                with ctx.member_doc_ctx(member) as member_doc:
+                    member_doc.silenced.append(ctx.guild.id)
+            content = (f"{members[0].display_name if len(members) == 1 else f'{len(members)} members'} "
+                       f"may no longer use commands{for_n_minutes}.")
+        else:
+            with ctx.guild_doc_ctx() as guild_doc:
                 guild_doc.silent = True
-                content = "Silent mode is now enabled. Nobody may use commands{for_n_minutes}."
+            content = f"Silent mode is now enabled. Nobody may use commands{for_n_minutes}."
         await ctx.send(content)
         await ctx.staff_log(content)
         if not minutes:
             return
         await asyncio.sleep(minutes * 60)
-        with ctx.guild_doc_ctx() as guild_doc:
-            if members:
-                new_silenced = set(guild_doc.silenced) - set(members)
-                if set(guild_doc.silenced) == new_silenced:    # If the members were unsilenced before now
-                    return
-                guild_doc.silenced = list(new_silenced)   # Remove the members from silenced
-                content = "The member(s) from {self.ona.plural(minutes, 'minute')} ago have been unsilenced."
-            else:
+        if members:
+            for member in members:
+                with ctx.member_doc_ctx(member) as member_doc:
+                    if ctx.guild.id not in member_doc.silenced:
+                        continue
+                    member_doc.silenced.remove(ctx.guild.id)
+                content = f"The member(s) from {self.ona.plural(minutes, 'minute')} ago have been unsilenced."
+        else:
+            with ctx.guild_doc_ctx() as guild_doc:
                 if not guild_doc.silent:    # If silent mode was disabled before now
                     return
                 guild_doc.silent = False
-                content = "Silent mode has been disabled. Everyone may use commands."
+            content = "Silent mode has been disabled. Everyone may use commands."
         await ctx.send(content)
         await ctx.staff_log(content)
 
@@ -141,18 +144,19 @@ class Staff(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def unsilence(self, ctx, *members: discord.Member):
         '''Disable silent mode, or unsilence any number of members.'''
-        with ctx.guild_doc_ctx() as guild_doc:
-            if members:
-                new_silenced = set(guild_doc.silenced) - set(members)
-                self.ona.assert_(set(guild_doc.silenced) != new_silenced,
-                                 error="None of these members are silenced.")
-                guild_doc.silenced = list(new_silenced)
-                content = (f"{members[0].display_name if len(members) == 1 else f'{len(members)} members'} "
-                           f"may use commands again.")
-            else:
+        if members:
+            for member in members:
+                with ctx.member_doc_ctx(member) as member_doc:
+                    if ctx.guild.id not in member_doc.silenced:
+                        continue
+                    member_doc.silenced.remove(ctx.guild.id)
+                    content = (f"{members[0].display_name if len(members) == 1 else f'{len(members)} members'} "
+                               f"may use commands again.")
+        else:
+            with ctx.guild_doc_ctx() as guild_doc:
                 self.ona.assert_(guild_doc.silent, error="Silent mode is already disabled.")
                 guild_doc.silent = False
-                content = "Silent mode has been disabled. Everyone may use commands."
+            content = "Silent mode has been disabled. Everyone may use commands."
         await ctx.send(content)
         await ctx.staff_log(content)
 
@@ -166,7 +170,12 @@ class Staff(commands.Cog):
                          error=f"The number of messages must be positive and fewer than {self.ona.config.max_prune}.")
         await ctx.message.delete()
         pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
-        await ctx.staff_log(f"Pruned {self.ona.plural(len(pruned), 'message')}.")
+        content = f"Pruned {self.ona.plural(len(pruned), 'message')}."
+        await ctx.send(content)
+        fields = [("Channel", ctx.channel.mention)]
+        if filter:
+            fields.append(("Filter", filter.mention))
+        await ctx.staff_log(content, fields=fields)
 
     @commands.command()
     @commands.has_permissions(manage_emojis=True)
@@ -180,7 +189,7 @@ class Staff(commands.Cog):
         except discord.HTTPException as e:
             raise self.ona.OnaError(f"Either the emote limit has been reached or the name '{name}' is invalid.")
         await ctx.staff_log(f"An emote was added: {emote}", fields=[("Name", emote.name)])
-        await ctx.clean_up(await ctx.send(f"The emote has been added successfully. {emote}"))
+        await ctx.send(f"The emote has been added successfully. {emote}")
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -207,7 +216,7 @@ class Staff(commands.Cog):
                 guild_doc[setting] = new_setting
         content = f"`{setting}` is now set to `{ctx.guild_doc[setting]}`."
         await ctx.staff_log(content)
-        await ctx.clean_up(await ctx.send(content))
+        await ctx.send(content)
 
     @commands.command()
     @commands.has_permissions(manage_guild=True)

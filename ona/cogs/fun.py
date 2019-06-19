@@ -1,6 +1,7 @@
 import random
 import discord
 from io import BytesIO
+from typing import Optional
 from discord.ext import commands
 from PIL import Image, ImageFilter, ImageDraw, ImageFont, ImageSequence
 
@@ -57,7 +58,7 @@ class Fun(commands.Cog):
 
     @commands.command()
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def resize(self, ctx, magnification: float = None, url=None):
+    async def resize(self, ctx, magnification: Optional[float], url=None):
         '''Resize an image.
         The magnification value can be any value, including a decimal.
         The new image may not be greater than 5,000x5,000.'''
@@ -76,7 +77,7 @@ class Fun(commands.Cog):
 
     @commands.command()
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def rotate(self, ctx, degrees: int = None, url=None):
+    async def rotate(self, ctx, degrees: Optional[int], url=None):
         '''Rotate an image by any number of degrees.'''
         try:
             degrees = degrees or int(await ctx.ask("Give a value to rotate the image by:"))
@@ -155,13 +156,9 @@ class Fun(commands.Cog):
 
     @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)
-    async def quote(self, ctx, member: discord.Member = None, number: int = None):
+    async def quote(self, ctx, member: discord.Member, number: int = None):
         '''Bring up quotes from another member.
         If no member is given, one is picked at random.'''
-        while not member:
-            aggregator = [{"$match": {"quotes": {"$not": {"$size": 0}}}}, {"$sample": {"size": 1}}]
-            member_doc = next(self.ona.user_db.collection.aggregate(aggregator))
-            member = ctx.guild.get_member(int(member_doc["_id"]))
         member_doc = self.ona.user_db.get_doc(member)
         number = number or random.randrange(len(member_doc.quotes))
         self.ona.assert_(member_doc.quotes, error=f"{member.display_name} has no quotes added.")

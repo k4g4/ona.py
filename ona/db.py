@@ -29,12 +29,12 @@ class OnaDB:
             doc = OnaDocument(self.collection.find_one_and_update({"_id": _id}, {"$setOnInsert": self.template},
                                                                   upsert=True, return_document=ReturnDocument.AFTER))
             self.doc_cache[_id] = doc
-        if not doc.keys() > self.template.keys():   # Basically, "the doc does not have every key in the template"
-            [doc.setdefault(key, self.template[key]) for key in self.template]    # Fill up missing keys
+        if not doc.keys() >= self.template.keys():   # Basically, "the doc does not have every key in the template"
+            [doc.setdefault(key, value) for key, value in self.template.items()]    # Fill up missing keys
             self.update_doc(doc)
         return doc
 
-    def update_doc(self, doc):  # This method should only ever be called by doc_context
+    def update_doc(self, doc):  # This method should not be called outside OnaDB, use doc_context instead
         if not self.collection.replace_one({"_id": doc["_id"]}, doc).matched_count:
             self.collection.insert_one({"_id": doc["_id"]})
 
