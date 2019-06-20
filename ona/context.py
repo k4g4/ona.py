@@ -1,3 +1,4 @@
+import re
 import asyncio
 import discord
 from io import BytesIO
@@ -32,15 +33,15 @@ class OnaContext(commands.Context):
     def member_doc_ctx(self, member):
         return self.ona.user_db.doc_context(member)
 
-    async def send(self, content="", *, multi=False, url=None, **kwargs):
+    async def send(self, content="", *, multi=False, asset=None, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
-        Discord character limit as well as the ability to upload an image from any url.'''
+        Discord character limit as well as the ability to specify an asset as the attachment.'''
         if multi:
             while len(content) > char_limit:
                 await super().send(content[:char_limit])
                 content = content[char_limit:]
-        if url:
-            kwargs["file"] = discord.File(BytesIO(await self.ona.request(url)), self.ona.filename_from_url(url))
+        if asset:
+            kwargs["file"] = discord.File(BytesIO(await asset.read()), self.ona.filename_from_url(str(asset)))
         return await super().send(content, **kwargs)
 
     async def prompt(self, content="", **kwargs):
@@ -140,12 +141,13 @@ class OnaContext(commands.Context):
         embed = self.ona.embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
         await self.guild.get_channel(logs).send(embed=embed)
 
-    async def get_attachment(self):
+    async def get_last_url(self):
         '''For commands that require a file attachment, first check if the user attached a file.
         If no file was attached, search chat history for the most recent file attachment.'''
-        message = await self.history().find(lambda m: len(m.attachments))
+        pattern = r"(http(s?):)([/|.|\w|\s|-])*\.(?:jpe?g|gif|png)"
+        message = await self.history(limit=50).find(lambda m: len(m.attachments) or re.search(pattern, m.content))
         self.ona.assert_(message, error="No file attachment was found.")
-        return message.attachments[0].url
+        return message.attachments[0].url if message.attachments else re.search(pattern, message.content)[0]
 
 
 def setup(ona):

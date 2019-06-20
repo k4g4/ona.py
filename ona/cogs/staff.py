@@ -130,7 +130,7 @@ class Staff(commands.Cog):
                     if ctx.guild.id not in member_doc.silenced:
                         continue
                     member_doc.silenced.remove(ctx.guild.id)
-                content = f"The member(s) from {self.ona.plural(minutes, 'minute')} ago have been unsilenced."
+            content = f"The member(s) from {self.ona.plural(minutes, 'minute')} ago have been unsilenced."
         else:
             with ctx.guild_doc_ctx() as guild_doc:
                 if not guild_doc.silent:    # If silent mode was disabled before now
@@ -150,8 +150,8 @@ class Staff(commands.Cog):
                     if ctx.guild.id not in member_doc.silenced:
                         continue
                     member_doc.silenced.remove(ctx.guild.id)
-                    content = (f"{members[0].display_name if len(members) == 1 else f'{len(members)} members'} "
-                               f"may use commands again.")
+            content = (f"{members[0].display_name if len(members) == 1 else f'{len(members)} members'} "
+                       f"may use commands again.")
         else:
             with ctx.guild_doc_ctx() as guild_doc:
                 self.ona.assert_(guild_doc.silent, error="Silent mode is already disabled.")
@@ -177,13 +177,13 @@ class Staff(commands.Cog):
             fields.append(("Filter", filter.mention))
         await ctx.staff_log(content, fields=fields)
 
-    @commands.command()
+    @commands.command(aliases=["add_emote"])
     @commands.has_permissions(manage_emojis=True)
     @commands.bot_has_permissions(manage_emojis=True)
     async def addemote(self, ctx, name=None, url=None):
         '''Create an emote in the server with the specified name.'''
         name = name or (await ctx.ask("Give a name for the emote:")).replace(" ", "_")
-        image = await self.ona.request(url or await ctx.get_attachment())
+        image = await self.ona.request(url or await ctx.get_last_url())
         try:
             emote = await ctx.guild.create_custom_emoji(name=name, image=image)
         except discord.HTTPException as e:
@@ -197,7 +197,7 @@ class Staff(commands.Cog):
         '''View all available server settings.'''
         await ctx.whisper(embed=self.ona.embed("\n".join(self.ona.guild_db.template.keys()), title="Settings"))
 
-    @commands.command()
+    @commands.command(aliases=["edit_setting"])
     @commands.has_permissions(administrator=True)
     async def editsetting(self, ctx, setting=None, value=None):
         '''Change any settings on a server.
@@ -220,12 +220,13 @@ class Staff(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(manage_guild=True)
+    @commands.bot_has_permissions(manage_guild=True)
     async def invites(self, ctx):
         '''Check invites in the server.'''
         invites = await ctx.guild.invites()
-        await ctx.send("All invites:\n" + ", ".join(f"{invite.inviter.name}: {invite.uses} uses"
-                                                    for invite in sorted(invites, key=lambda i: i.uses, reverse=True)
-                                                    if invite.uses > 0))
+        await ctx.send(", ".join(f"{invite.inviter.name}: {invite.uses:,} uses"
+                                 for invite in sorted(invites, key=lambda i: i.uses, reverse=True)[:20]
+                                 if invite.uses > 0))
 
     @commands.command(aliases=["shutdown"])
     @commands.is_owner()
@@ -238,11 +239,11 @@ class Staff(commands.Cog):
         else:
             await ctx.send("Shutdown aborted.")
 
-    @commands.command(aliases=["editavi"])
+    @commands.command(aliases=["editavi", "edit_avatar", "edit_avi"])
     @commands.is_owner()
     async def editavatar(self, ctx, url=None):
         '''Change Ona's avatar.'''
-        await self.ona.user.edit(avatar=await self.ona.request(url or await ctx.get_attachment()))
+        await self.ona.user.edit(avatar=await self.ona.request(url or await ctx.get_last_url()))
         content = "My avatar has been updated."
         await ctx.staff_log(content)
         await ctx.send(content)
@@ -256,9 +257,9 @@ class Staff(commands.Cog):
         except Exception as e:
             raise self.ona.OnaError(f"{type(e).__name__}: {e}")
 
-    @commands.command()
+    @commands.command(aliases=["edit_money"])
     @commands.is_owner()
-    async def hack(self, ctx, member: discord.Member, money: int):
+    async def editmoney(self, ctx, member: discord.Member, money: int):
         '''Give or remove money from a user.'''
         with ctx.member_doc_ctx(member) as member_doc:
             member_doc.money += money

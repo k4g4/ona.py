@@ -36,33 +36,36 @@ class Utility(commands.Cog):
         '''See how many members are in the server.'''
         await ctx.send(f"We're at **{ctx.guild.member_count:,}** members! {self.ona.config.heart_eyes}")
 
-    @commands.command(aliases=["server"])
+    @commands.command(aliases=["server", "server_info"])
     @commands.guild_only()
     async def serverinfo(self, ctx):
         '''See detailed information about a server.'''
-        fields = [("Owner", ctx.guild.owner.mention), ("Members", f"{ctx.guild.member_count:,}"),
-                  ("ID", ctx.guild.id), ("Roles", len(ctx.guild.roles)),
-                  ("Created", ctx.guild.created_at.strftime("%b %d, %Y")),
+        fields = [("Owner", ctx.guild.owner.mention), ("ID", ctx.guild.id),
+                  ("Members", f"{ctx.guild.member_count:,}"), ("Boosts", ctx.guild.premium_subscription_count),
+                  ("Roles", len(ctx.guild.roles)), ("Created", ctx.guild.created_at.strftime("%b %d, %Y")),
                   ("Channels", f"{len(ctx.guild.text_channels)} text, {len(ctx.guild.voice_channels)} voice"),
-                  ("Static Emotes", f"{len([str(emoji) for emoji in ctx.guild.emojis if not emoji.animated])} / 50"),
-                  ("Animated Emotes", f"{len([str(emoji) for emoji in ctx.guild.emojis if emoji.animated])} / 50")]
+                  ("Static Emotes", (f"{len([str(emoji) for emoji in ctx.guild.emojis if not emoji.animated])}"
+                                     f" / {ctx.guild.emoji_limit}")),
+                  ("Animated Emotes", (f"{len([str(emoji) for emoji in ctx.guild.emojis if emoji.animated])}"
+                                       f" / {ctx.guild.emoji_limit}"))]
         thumbnail = ctx.guild.icon_url_as(format="png")
         embed = self.ona.embed(title=ctx.guild.name, thumbnail=thumbnail, fields=fields)
+        embed.set_image(url=ctx.guild.banner_url)
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["avi", "pfp"])
+    @commands.command(aliases=["avi", "profile_picture", "pfp"])
     async def avatar(self, ctx, member: discord.Member = None):
         '''Display a user's avatar.'''
         member = member or ctx.author
-        await ctx.send(url=member.avatar_url_as(static_format="png", size=256))
+        await ctx.send(asset=member.avatar_url_as(static_format="png", size=256))
 
     @commands.command(aliases=["emoji", "e"])
     async def emote(self, ctx, emoji: discord.PartialEmoji):
         '''Get a fullsize image for an emote.
         Only works for emotes in servers Ona shares.'''
-        await ctx.send(url=emoji.url)
+        await ctx.send(asset=emoji.url)
 
-    @commands.command(aliases=["info", "member"])
+    @commands.command(aliases=["info", "member", "member_info", "userinfo", "user_info"])
     async def memberinfo(self, ctx, member: discord.Member = None):
         '''See detailed information about a member.'''
         member = member or ctx.author
@@ -83,7 +86,7 @@ class Utility(commands.Cog):
             embed.color = member.color
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["np"])
+    @commands.command(aliases=["np", "now_playing"])
     async def nowplaying(self, ctx, member: discord.Member = None):
         '''See what a member is listening to on Spotify.'''
         member = member or ctx.author
@@ -92,7 +95,7 @@ class Utility(commands.Cog):
         spotify = member.activity
         fields = [("Album", spotify.album), ("Artists", ", ".join(spotify.artists))]
         duration, current = spotify.duration, datetime.utcnow() - spotify.start
-        position = f"{current.seconds//60}:{current.seconds%60} / {duration.seconds//60}:{duration.seconds%60}"
+        position = f"{current.seconds//60}:{current.seconds%60:02} / {duration.seconds//60}:{duration.seconds%60:02}"
         fields.append(("Song Position", position))
         thumbnail = spotify.album_cover_url
         embed = self.ona.embed(title=spotify.title, thumbnail=thumbnail, author=member, fields=fields)
@@ -111,7 +114,7 @@ class Utility(commands.Cog):
             embeds.append(embed.set_thumbnail(url="https://i.imgur.com/oRN5hP2.png"))
         await ctx.embed_browser(embeds)
 
-    @commands.command(aliases=["img", "image"])
+    @commands.command(aliases=["img", "image", "image_search"])
     @commands.cooldown(2, 15, commands.BucketType.user)
     async def imagesearch(self, ctx, *, query):
         '''Search for any image using Google.'''
@@ -142,7 +145,7 @@ class Utility(commands.Cog):
         results = (await self.ona.request(search_url, params=params, headers=headers))["results"]
         self.ona.assert_(len(results), error=f"'{query}' is not an English word.")
         entry_url = "https://od-api.oxforddictionaries.com/api/v1/entries/en/" + results[0]["id"].lower()
-        lex_entries = self.ona.request(entry_url, headers=headers)["results"][0]["lexicalEntries"]
+        lex_entries = (await self.ona.request(entry_url, headers=headers))["results"][0]["lexicalEntries"]
 
         def combine_defs(lex_entry):    # flatten each lexical entry into a list of definitions
             senses = (sense for entry in lex_entry["entries"] for sense in entry["senses"] if "definitions" in sense)
@@ -186,7 +189,7 @@ class Utility(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def source(self, ctx, url=None):
         '''Perform a reverse image search using iqdb.org.'''
-        url = url or await ctx.get_attachment()
+        url = url or await ctx.get_last_url()
         body = (await self.ona.request("http://iqdb.org", method="POST", data={"url": url})).decode()
         self.ona.assert_("No relevant matches" not in body, "HTTP request failed" not in body,
                          error="No results found.")

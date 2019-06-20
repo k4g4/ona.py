@@ -27,11 +27,14 @@ class Fun(commands.Cog):
         ship_name = "".join(name[i * (len(name) // len(members)): (i+1) * -(-len(name) // len(members))]
                             for i, name in enumerate(member.display_name for member in members))    # Combine names
         avatar_size = 128
-        image = Image.new("RGBA", (len(members) * avatar_size, avatar_size))
-        urls = (member.avatar_url_as(static_format="png", size=avatar_size) for member in members)
-        avatars = map(Image.open, map(BytesIO, [await self.ona.request(url) for url in urls]))
+        image = Image.new("RGBA", ((len(members) * 2 - 1) * avatar_size, avatar_size))
+        assets = (member.avatar_url_as(static_format="png", size=avatar_size) for member in members)
+        avatars = map(Image.open, map(BytesIO, [await asset.read() for asset in assets]))
+        heart = Image.open(self.ona.resources["heart"])
         for i, avatar in enumerate(avatars):
-            image.alpha_composite(avatar.convert(mode="RGBA"), dest=(avatar_size * i, 0))   # Combine avatars
+            image.alpha_composite(avatar.convert(mode="RGBA"), dest=(avatar_size * i * 2, 0))   # Attach avatar
+            if i != 0:
+                image.alpha_composite(heart, dest=(avatar_size * (i * 2 - 1), 0))                 # Attach heart
         ship_image = BytesIO()
         image.save(ship_image, format="PNG")
         ship_image.seek(0)
@@ -73,7 +76,7 @@ class Fun(commands.Cog):
             self.ona.assert_(new_size[0] < max_size, new_size[1] < max_size, error="This image is too large.")
             return image.resize(new_size, Image.LANCZOS)
 
-        await ctx.send(file=await self.edit_image(url or await ctx.get_attachment(), get_resized))
+        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(), get_resized))
 
     @commands.command()
     @commands.cooldown(1, 5, commands.BucketType.channel)
@@ -85,7 +88,7 @@ class Fun(commands.Cog):
             raise self.ona.OnaError("Not a valid rotation value.")
 
         resample = Image.BICUBIC
-        await ctx.send(file=await self.edit_image(url or await ctx.get_attachment(),
+        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(),
                                                   lambda image, data: image.rotate(degrees, resample=resample)))
 
     @commands.command()
@@ -100,7 +103,7 @@ class Fun(commands.Cog):
         except AttributeError:
             raise self.ona.OnaError((f"That filter isn't recognized."
                                      f"Use `{ctx.prefix}help filter` to see all filters."))
-        await ctx.send(file=await self.edit_image(url or await ctx.get_attachment(),
+        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(),
                                                   lambda image, data: image.convert("RGBA").filter(filter)))
 
     @commands.command(aliases=["caption"])
@@ -108,7 +111,7 @@ class Fun(commands.Cog):
     async def meme(self, ctx, *, caption: commands.clean_content = None):
         '''Make a meme using any image and a caption.
         Separate top from bottom text using the '|' character.'''
-        self.ona.assert_(caption, error="Provide a caption for the image.")
+        caption = caption or await ctx.ask("Provide a caption for the image:")
         url = None
         for word in caption.split():
             if word.startswith("http"):
@@ -152,7 +155,7 @@ class Fun(commands.Cog):
             draw_outlined_text(draw, **bottom)
             return image
 
-        await ctx.send(file=await self.edit_image(url or await ctx.get_attachment(), get_captioned, get_caption_data))
+        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(), get_captioned, get_caption_data))
 
     @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)
