@@ -141,13 +141,15 @@ class OnaContext(commands.Context):
         embed = self.ona.embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
         await self.guild.get_channel(logs).send(embed=embed)
 
-    async def get_last_url(self):
-        '''For commands that require a file attachment, first check if the user attached a file.
-        If no file was attached, search chat history for the most recent file attachment.'''
+    async def get_last_url(self, count=1):
+        '''For commands that require one or more images, first check if the user attached or linked a image.
+        If no image was attached or linked, search chat history for the most recent image(s).'''
         pattern = r"(http(s?):)([/|.|\w|\s|-])*\.(?:jpe?g|gif|png)"
-        message = await self.history(limit=50).find(lambda m: len(m.attachments) or re.search(pattern, m.content))
-        self.ona.assert_(message, error="No file attachment was found.")
-        return message.attachments[-1].url if message.attachments else re.search(pattern, message.content)[0]
+        filter = self.history(limit=50).filter(lambda m: len(m.attachments) or re.search(pattern, m.content))
+        urls = [message.attachments[-1].url if message.attachments else re.search(pattern, message.content)[0]
+                for message in await filter.flatten()]
+        self.ona.assert_(urls, error="No images were found.")
+        return urls[0] if count == 1 else urls[:count]
 
 
 def setup(ona):

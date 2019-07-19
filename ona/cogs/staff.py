@@ -250,6 +250,16 @@ class Staff(commands.Cog):
         await ctx.send(content)
 
     @commands.command()
+    @commands.has_permissions(manage_roles=True)
+    async def unquote(self, ctx, member: discord.Member, number: int):
+        '''Remove a quote from a member.'''
+        with ctx.member_doc_ctx(member) as member_doc:
+            member_doc.quotes.pop(number - 1)
+        content = f"{member.display_name}'s {self.ona.ordinal(number)} quote has been removed."
+        await ctx.send(content)
+        await ctx.staff_log(content)
+
+    @commands.command()
     @commands.has_permissions(manage_guild=True)
     @commands.bot_has_permissions(manage_guild=True)
     async def invites(self, ctx):

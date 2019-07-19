@@ -156,6 +156,16 @@ class Fun(commands.Cog):
         await ctx.send(file=await self.edit_image(url, get_captioned, get_caption_data))
 
     @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def gif(self, ctx, count: int = 10):
+        '''Create a gif from the last few images in the channel.'''
+        new_gif = BytesIO()
+        images = [Image.open(BytesIO(await self.ona.request(url))) for url in await ctx.get_last_url(count=count)]
+        images[0].save(new_gif, format="GIF", save_all=True, append_images=images[1:], optimize=True, loop=0)
+        new_gif.seek(0)
+        await ctx.send(file=discord.File(new_gif, "new_gif.gif"))
+
+    @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)
     async def quote(self, ctx, member: discord.Member, number: Optional[int]):
         '''Bring up quotes from another member.
