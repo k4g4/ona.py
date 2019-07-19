@@ -59,9 +59,9 @@ class Fun(commands.Cog):
         new_image.seek(0)
         return discord.File(new_image, self.ona.filename_from_url(url))
 
-    @commands.command()
+    @commands.command(aliases=["size", "scale"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def resize(self, ctx, magnification: Optional[float], url=None):
+    async def resize(self, ctx, magnification: Optional[float]):
         '''Resize an image.
         The magnification value can be any value, including a decimal.
         The new image may not be greater than 5,000x5,000.'''
@@ -76,11 +76,11 @@ class Fun(commands.Cog):
             self.ona.assert_(new_size[0] < max_size, new_size[1] < max_size, error="This image is too large.")
             return image.resize(new_size, Image.LANCZOS)
 
-        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(), get_resized))
+        await ctx.send(file=await self.edit_image(await ctx.get_last_url(), get_resized))
 
-    @commands.command()
+    @commands.command(aliases=["spin"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def rotate(self, ctx, degrees: Optional[int], url=None):
+    async def rotate(self, ctx, degrees: Optional[int]):
         '''Rotate an image by any number of degrees.'''
         try:
             degrees = degrees or int(await ctx.ask("Give a value to rotate the image by:"))
@@ -88,12 +88,12 @@ class Fun(commands.Cog):
             raise self.ona.OnaError("Not a valid rotation value.")
 
         resample = Image.BICUBIC
-        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(),
+        await ctx.send(file=await self.edit_image(await ctx.get_last_url(),
                                                   lambda image, data: image.rotate(degrees, resample=resample)))
 
     @commands.command()
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def filter(self, ctx, filter="blur", url=None):
+    async def filter(self, ctx, filter="blur"):
         '''Apply a filter to an image.
         The available filters are: blur, contour, detail, edge_enhance, edge_enhance_more, emboss,
         find_edges, sharpen, smooth, and smooth_more.'''
@@ -103,7 +103,7 @@ class Fun(commands.Cog):
         except AttributeError:
             raise self.ona.OnaError((f"That filter isn't recognized."
                                      f"Use `{ctx.prefix}help filter` to see all filters."))
-        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(),
+        await ctx.send(file=await self.edit_image(await ctx.get_last_url(),
                                                   lambda image, data: image.convert("RGBA").filter(filter)))
 
     @commands.command(aliases=["caption"])
@@ -112,11 +112,8 @@ class Fun(commands.Cog):
         '''Make a meme using any image and a caption.
         Separate top from bottom text using the '|' character.'''
         caption = caption or await ctx.ask("Provide a caption for the image:")
-        url = None
-        for word in caption.split():
-            if word.startswith("http"):
-                caption = caption.replace(word, "")
-                url = word
+        url = await ctx.get_last_url()
+        caption = caption.replace(url, "")      # If the url is in the command, remove it
 
         def get_caption_data(image):
             top, bottom = {}, {}
@@ -155,7 +152,7 @@ class Fun(commands.Cog):
             draw_outlined_text(draw, **bottom)
             return image
 
-        await ctx.send(file=await self.edit_image(url or await ctx.get_last_url(), get_captioned, get_caption_data))
+        await ctx.send(file=await self.edit_image(url, get_captioned, get_caption_data))
 
     @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)

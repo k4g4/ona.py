@@ -144,10 +144,10 @@ class OnaContext(commands.Context):
     async def get_last_url(self):
         '''For commands that require a file attachment, first check if the user attached a file.
         If no file was attached, search chat history for the most recent file attachment.'''
-        pattern = r"(http(s?):)([/|.|\w|\s|-])*\.(?:jpe?g|gif|png)"
+        pattern = r"(http(s?):)([/|.|\w|\s|-])*\.(?:jpe?g|gif|png|webm)"
         message = await self.history(limit=50).find(lambda m: len(m.attachments) or re.search(pattern, m.content))
         self.ona.assert_(message, error="No file attachment was found.")
-        return message.attachments[0].url if message.attachments else re.search(pattern, message.content)[0]
+        return message.attachments[-1].url if message.attachments else re.search(pattern, message.content)[0]
 
 
 def setup(ona):

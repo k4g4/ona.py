@@ -21,14 +21,13 @@ class Utility(commands.Cog):
         await asyncio.sleep(2)
         end = time.time()
         await message.edit(content=f"My ping is... **{round((end-start-2) * 1000, 2)}** milliseconds.")
-        await ctx.clean_up(message)
 
     @commands.command()
     async def uptime(self, ctx):
         '''Check how long Ona has been running for.'''
         delta = datetime.utcnow() - self.ona.uptime
         uptime = self.ona.plural(delta.days, 'day') if delta.days else self.ona.plural(delta.seconds, 'second')
-        await ctx.clean_up(await ctx.send(f"I've been running for {uptime}."))
+        await ctx.send(f"I've been running for {uptime}.")
 
     @commands.command()
     @commands.guild_only()
@@ -103,7 +102,7 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["search", "g"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def google(self, ctx, *, query):
+    async def google(self, ctx, *, query=""):
         '''Search for anything on Google.'''
         query = query or await ctx.ask("Give a word or phrase to search:")
         fields = [(result["title"], result["link"]) for result in await self.ona.google_search(query)]
@@ -116,7 +115,7 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["img", "image", "image_search"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def imagesearch(self, ctx, *, query):
+    async def imagesearch(self, ctx, *, query=""):
         '''Search for any image using Google.'''
         query = query or await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(query, image=True)
@@ -128,7 +127,7 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["yt"])
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def youtube(self, ctx, *, query):
+    async def youtube(self, ctx, *, query=""):
         '''Search for a video on YouTube.'''
         query = query if query else await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(f"youtube {query}")
@@ -136,7 +135,7 @@ class Utility(commands.Cog):
 
     @commands.command()
     @commands.cooldown(2, 15, commands.BucketType.user)
-    async def define(self, ctx, *, query):
+    async def define(self, ctx, *, query=""):
         '''Find the definition for a word or phrase.'''
         query = query or await ctx.ask("Give a word or phrase to define:")
         search_url = "https://od-api.oxforddictionaries.com/api/v1/search/en"
@@ -159,8 +158,25 @@ class Utility(commands.Cog):
             embeds.append(embed.set_thumbnail(url="https://i.imgur.com/hd60hLe.png"))
         await ctx.embed_browser(embeds)
 
+    @commands.command(aliases=["ud"])
+    @commands.cooldown(2, 15, commands.BucketType.user)
+    async def urban(self, ctx, *, query=""):
+        '''Find the urban dictionary entry for a word or phrase.'''
+        query = query or await ctx.ask("Give a word or phrase to search for:")
+        results = (await self.ona.request(f"https://api.urbandictionary.com/v0/define?term={query}"))["list"]
+        embeds = []
+
+        def strip(s):
+            return s.replace("[", "").replace("]", "")
+        for result in results:
+            fields = [("Definition", strip(result["definition"])), ("Example", strip(result["example"]))]
+            embed = self.ona.embed(title=query.title(), author=ctx.author, fields=fields)
+            embed.url = result["permalink"]
+            embeds.append(embed.set_thumbnail(url="https://i.imgur.com/RoKVYoy.jpg"))
+        await ctx.embed_browser(embeds)
+
     @commands.command()
-    async def osu(self, ctx, *, username):
+    async def osu(self, ctx, *, username=""):
         '''Search for an osu! profile.
         Provide either an osu! username or user id.'''
         username = username or await ctx.ask("Give a username to search for:")
@@ -187,9 +203,9 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["sauce"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
-    async def source(self, ctx, url=None):
+    async def source(self, ctx):
         '''Perform a reverse image search using iqdb.org.'''
-        url = url or await ctx.get_last_url()
+        url = await ctx.get_last_url()
         body = (await self.ona.request("http://iqdb.org", method="POST", data={"url": url})).decode()
         self.ona.assert_("No relevant matches" not in body, "HTTP request failed" not in body,
                          error="No results found.")

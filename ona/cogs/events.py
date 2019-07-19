@@ -85,7 +85,9 @@ class Events(commands.Cog):
         elif isinstance(error, self.ona.OnaError):
             error_text = str(error)
         else:
-            error_text = f"{type(error).__name__}: {error} (line #{error.__traceback__.tb_next.tb_lineno})"
+            error_text = f"{type(error).__name__}: {error} "
+            if hasattr(error.__traceback__, "tb_next"):
+                error_text += f"(line #{error.__traceback__.tb_next.tb_lineno})"
             print(error_text)
             embed = self.ona.embed(error_text, timestamp=True, author=self.ona.user)
             main_guild = self.ona.get_guild(self.ona.config.main_guild)

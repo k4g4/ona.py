@@ -10,6 +10,7 @@ class Staff(commands.Cog):
 
     def __init__(self, ona):
         self.ona = ona
+        self.r9k_message_cache = []
 
     @commands.command()
     @commands.has_permissions(kick_members=True)
@@ -163,7 +164,7 @@ class Staff(commands.Cog):
     @commands.command(aliases=["purge"])
     @commands.has_permissions(manage_messages=True)
     @commands.bot_has_permissions(manage_messages=True)
-    async def prune(self, ctx, count: int, filter: discord.Member = None):
+    async def prune(self, ctx, filter: Optional[discord.Member], count: int):
         '''Prune multiple messages from a channel.
         If a member is provided, only that member's messages are removed out of the number of messages given.'''
         self.ona.assert_(0 < count < self.ona.config.max_prune,
@@ -177,13 +178,42 @@ class Staff(commands.Cog):
             fields.append(("Filter", filter.mention))
         await ctx.staff_log(content, fields=fields)
 
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    @commands.bot_has_permissions(manage_messages=True)
+    async def r9k(self, ctx, minutes: Optional[int]):
+        '''Enable or disable R9K mode in the channel.'''
+        with ctx.guild_doc_ctx() as guild_doc:
+            if ctx.channel.id not in guild_doc.r9k:
+                guild_doc.r9k.append(ctx.channel.id)
+                await ctx.send(f"R9K mode has been enabled in {ctx.channel.mention}.")
+            else:
+                guild_doc.r9k.remove(ctx.channel.id)
+                await ctx.send(f"R9K mode has been disabled in {ctx.channel.mention}.")
+        await asyncio.sleep(minutes * 60)
+        with ctx.guild_doc_ctx() as guild_doc:
+            if ctx.channel.id in guild_doc.r9k:
+                guild_doc.r9k.remove(ctx.channel.id)
+                await ctx.send(f"R9K mode has been disabled in {ctx.channel.mention}.")
+
+    @commands.Cog.listener(name="on_message")
+    async def r9k_listener(self, message):
+        if message.channel.id not in self.ona.guild_db.get_doc(message.guild).r9k:
+            return
+        if message.channel.permissions_for(message.author).administrator:
+            return
+        if len(message.content) < 50:
+            return
+        if await message.channel.history(before=message).get(content=message.content):
+            await message.delete()
+
     @commands.command(aliases=["add_emote"])
     @commands.has_permissions(manage_emojis=True)
     @commands.bot_has_permissions(manage_emojis=True)
-    async def addemote(self, ctx, name=None, url=None):
+    async def addemote(self, ctx, name=None):
         '''Create an emote in the server with the specified name.'''
         name = name or (await ctx.ask("Give a name for the emote:")).replace(" ", "_")
-        image = await self.ona.request(url or await ctx.get_last_url())
+        image = await self.ona.request(await ctx.get_last_url())
         try:
             emote = await ctx.guild.create_custom_emoji(name=name, image=image)
         except discord.HTTPException as e:
@@ -241,9 +271,9 @@ class Staff(commands.Cog):
 
     @commands.command(aliases=["editavi", "edit_avatar", "edit_avi"])
     @commands.is_owner()
-    async def editavatar(self, ctx, url=None):
+    async def editavatar(self, ctx):
         '''Change Ona's avatar.'''
-        await self.ona.user.edit(avatar=await self.ona.request(url or await ctx.get_last_url()))
+        await self.ona.user.edit(avatar=await self.ona.request(await ctx.get_last_url()))
         content = "My avatar has been updated."
         await ctx.staff_log(content)
         await ctx.send(content)
