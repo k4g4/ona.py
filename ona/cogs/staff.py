@@ -182,7 +182,8 @@ class Staff(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(manage_messages=True)
     async def r9k(self, ctx, minutes: Optional[int]):
-        '''Enable or disable R9K mode in the channel.'''
+        '''Enable or disable R9K mode in the channel.
+        When enabled, R9K mode will delete long duplicate messages.'''
         with ctx.guild_doc_ctx() as guild_doc:
             if ctx.channel.id not in guild_doc.r9k:
                 guild_doc.r9k.append(ctx.channel.id)
@@ -202,7 +203,7 @@ class Staff(commands.Cog):
             return
         if message.channel.permissions_for(message.author).administrator:
             return
-        if len(message.content) < 50:
+        if len(message.content) < self.ona.config.min_r9k_char:
             return
         if await message.channel.history(before=message).get(content=message.content):
             await message.delete()

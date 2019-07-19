@@ -118,6 +118,7 @@ class Fun(commands.Cog):
         def get_caption_data(image):
             top, bottom = {}, {}
             top["text"], bottom["text"] = caption.upper().split("|") if "|" in caption else (caption.upper(), "")
+            top["text"], bottom["text"] = top["text"].strip(), bottom["text"].strip()
 
             def get_text_info(text):    # Returns font, outline thickness, and x position
                 if not text:
@@ -156,9 +157,9 @@ class Fun(commands.Cog):
 
     @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)
-    async def quote(self, ctx, member: discord.Member, number: int = None):
+    async def quote(self, ctx, member: discord.Member, number: Optional[int]):
         '''Bring up quotes from another member.
-        If no member is given, one is picked at random.'''
+        To add a new quote, react to a message with 📌 if quoting is enabled in the server.'''
         member_doc = self.ona.user_db.get_doc(member)
         number = number or random.randrange(len(member_doc.quotes))
         self.ona.assert_(member_doc.quotes, error=f"{member.display_name} has no quotes added.")
@@ -173,6 +174,39 @@ class Fun(commands.Cog):
             embed.set_author(name=name, icon_url=member.avatar_url)
             quotes.append(embed)
         await ctx.embed_browser(quotes, pos=number-1 or 0)
+
+    @commands.Cog.listener(name="on_raw_reaction_add")
+    async def add_quote_listener(self, payload):
+        guild = self.ona.get_guild(payload.guild_id)    # unpack the raw payload data
+        if not guild:
+            return
+        if payload.emoji.name != "📌" or not self.ona.guild_db.get_doc(guild).quoting:
+            return
+        member = guild.get_member(payload.user_id)
+        channel = guild.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        if message.author == member:
+            await channel.send(f"You can't quote yourself. {self.ona.config.error}",
+                               delete_after=self.ona.config.delete_timer)
+            return
+        if message.id in (quote["id"] for quote in self.ona.user_db.get_doc(message.author).quotes):
+            await channel.send(f"This quote has already been added. {self.ona.config.error}",
+                               delete_after=self.ona.config.delete_timer)
+            return
+        quote = {
+            "id": message.id, "timestamp": message.created_at, "content": message.content,
+            "attachment": message.attachments[0].url if message.attachments else ""
+        }
+        with self.ona.user_db.doc_context(message.author) as quoted_member_doc:
+            quoted_member_doc.quotes.append(quote)
+            quote_number = len(quoted_member_doc.quotes)
+        content = (f"{message.author.display_name} had their {self.ona.ordinal(quote_number)} "
+                   f"quote added by {member.display_name}.")
+        await channel.send(content)
+        fields = [("Number", str(quote_number)), ("Channel", channel.mention)]
+        embed = self.ona.embed(quote["content"], title=content, timestamp=True, author=message.author, fields=fields)
+        embed.set_image(url=quote["attachment"])
+        await guild.get_channel(self.ona.guild_db.get_doc(guild).logs).send(embed=embed)
 
 
 def setup(ona):
