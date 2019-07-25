@@ -138,8 +138,7 @@ class Staff(commands.Cog):
                     return
                 guild_doc.silent = False
             content = "Silent mode has been disabled. Everyone may use commands."
-        await ctx.send(content)
-        await ctx.staff_log(content)
+        await ctx.send(content, staff_log=True)
 
     @commands.command(aliases=["unsilent"])
     @commands.has_permissions(manage_messages=True)
@@ -158,8 +157,7 @@ class Staff(commands.Cog):
                 self.ona.assert_(guild_doc.silent, error="Silent mode is already disabled.")
                 guild_doc.silent = False
             content = "Silent mode has been disabled. Everyone may use commands."
-        await ctx.send(content)
-        await ctx.staff_log(content)
+        await ctx.send(content, staff_log=True)
 
     @commands.command(aliases=["purge"])
     @commands.has_permissions(manage_messages=True)
@@ -187,15 +185,15 @@ class Staff(commands.Cog):
         with ctx.guild_doc_ctx() as guild_doc:
             if ctx.channel.id not in guild_doc.r9k:
                 guild_doc.r9k.append(ctx.channel.id)
-                await ctx.send(f"R9K mode has been enabled in {ctx.channel.mention}.")
+                await ctx.send(f"R9K mode has been enabled in {ctx.channel.mention}.", staff_log=True)
             else:
                 guild_doc.r9k.remove(ctx.channel.id)
-                await ctx.send(f"R9K mode has been disabled in {ctx.channel.mention}.")
+                await ctx.send(f"R9K mode has been disabled in {ctx.channel.mention}.", staff_log=True)
         await asyncio.sleep(minutes * 60)
         with ctx.guild_doc_ctx() as guild_doc:
             if ctx.channel.id in guild_doc.r9k:
                 guild_doc.r9k.remove(ctx.channel.id)
-                await ctx.send(f"R9K mode has been disabled in {ctx.channel.mention}.")
+                await ctx.send(f"R9K mode has been disabled in {ctx.channel.mention}.", staff_log=True)
 
     @commands.Cog.listener(name="on_message")
     async def r9k_listener(self, message):
@@ -245,9 +243,7 @@ class Staff(commands.Cog):
                 guild_doc[setting] = loads(new_setting)
             except JSONDecodeError:
                 guild_doc[setting] = new_setting
-        content = f"`{setting}` is now set to `{ctx.guild_doc[setting]}`."
-        await ctx.staff_log(content)
-        await ctx.send(content)
+        await ctx.send(f"`{setting}` is now set to `{ctx.guild_doc[setting]}`.", staff_log=True)
 
     @commands.command()
     @commands.has_permissions(manage_roles=True)
@@ -255,19 +251,15 @@ class Staff(commands.Cog):
         '''Remove a quote from a member.'''
         with ctx.member_doc_ctx(member) as member_doc:
             member_doc.quotes.pop(number - 1)
-        content = f"{member.display_name}'s {self.ona.ordinal(number)} quote has been removed."
-        await ctx.send(content)
-        await ctx.staff_log(content)
+        await ctx.send(f"{member.display_name}'s {self.ona.ordinal(number)} quote has been removed.", staff_log=True)
 
     @commands.command()
     @commands.has_permissions(manage_guild=True)
     @commands.bot_has_permissions(manage_guild=True)
     async def invites(self, ctx):
         '''Check invites in the server.'''
-        invites = await ctx.guild.invites()
-        await ctx.send(", ".join(f"{invite.inviter.name}: {invite.uses:,} uses"
-                                 for invite in sorted(invites, key=lambda i: i.uses, reverse=True)[:20]
-                                 if invite.uses > 0))
+        await ctx.table({invite.inviter: invite.uses for invite in await ctx.guild.invites()},
+                        title="server invites", label="use")
 
     @commands.command(aliases=["shutdown"])
     @commands.is_owner()
@@ -285,9 +277,7 @@ class Staff(commands.Cog):
     async def editavatar(self, ctx):
         '''Change Ona's avatar.'''
         await self.ona.user.edit(avatar=await self.ona.request(await ctx.get_last_url()))
-        content = "My avatar has been updated."
-        await ctx.staff_log(content)
-        await ctx.send(content)
+        await ctx.send("My avatar has been updated.", staff_log=True)
 
     @commands.command(name="eval")
     @commands.is_owner()
@@ -305,8 +295,7 @@ class Staff(commands.Cog):
         with ctx.member_doc_ctx(member) as member_doc:
             member_doc.money += money
         content = f"{member.display_name} {'gained' if money >= 0 else 'lost'} {abs(money)} {ctx.guild_doc.currency}."
-        await ctx.staff_log(content)
-        await ctx.send(content)
+        await ctx.send(content, staff_log=True)
 
 
 def setup(ona):

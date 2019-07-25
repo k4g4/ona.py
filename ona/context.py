@@ -33,7 +33,7 @@ class OnaContext(commands.Context):
     def member_doc_ctx(self, member):
         return self.ona.user_db.doc_context(member)
 
-    async def send(self, content="", *, multi=False, asset=None, **kwargs):
+    async def send(self, content="", *, multi=False, asset=None, staff_log=False, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
         Discord character limit as well as the ability to specify an asset as the attachment.'''
         if multi:
@@ -42,6 +42,8 @@ class OnaContext(commands.Context):
                 content = content[char_limit:]
         if asset:
             kwargs["file"] = discord.File(BytesIO(await asset.read()), self.ona.filename_from_url(str(asset)))
+        if staff_log:
+            await self.staff_log(content)
         return await super().send(content, **kwargs)
 
     async def prompt(self, content="", **kwargs):
@@ -59,9 +61,9 @@ class OnaContext(commands.Context):
 
     async def ask(self, content="", options=[], *, embed=None, **kwargs):
         '''Ask the user for a response from a list of options and return the position of the chosen option.
-        If no option list is provided, return any response from the user as a string.'''
+        If no option list is provided, returns any response from the user as a string.'''
         if embed:
-            embed.description = embed.description if embed.description else ""
+            embed.description = embed.description or ""
         for i, option in enumerate(options, 1):
             row = f"\n▫ {i}) {option}"
             if embed:
@@ -71,7 +73,7 @@ class OnaContext(commands.Context):
         message = await self.send(content, embed=embed, **kwargs)
 
         def check(m):
-            if m.author != self.author:
+            if m.author != self.author or m.content == "":
                 return False
             return not options or m.content.isdigit() and int(m.content) <= len(options)
         try:
@@ -96,25 +98,35 @@ class OnaContext(commands.Context):
         await message.add_reaction("➡")
 
         def check(r, u):
-            if u != self.author:
-                return False
-            return r.message.id == message.id and not u.bot and not r.custom_emoji and r.emoji in "⬅➡"
+            return u == self.author and r.message.id == message.id and not r.custom_emoji and r.emoji in "⬅➡"
         while True:
             try:
                 timeout = self.ona.config.response_timeout
-                reaction, user = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
+                reaction, _ = await self.ona.wait_for("reaction_add", timeout=timeout, check=check)
             except asyncio.TimeoutError:
                 break
             if can_remove_reacts:
-                await reaction.remove(user)
-            if user == self.author:
-                # Increment or decrement the position according to the reaction, unless at either end of the list
-                pos += 1 if reaction.emoji == "➡" and pos < len(embeds) - 1 else 0
-                pos -= 1 if reaction.emoji == "⬅" and pos > 0 else 0
-                await message.edit(embed=embeds[pos])
+                await reaction.remove(self.author)
+            # Increment or decrement the position according to the reaction, unless at either end of the list
+            pos += 1 if reaction.emoji == "➡" and pos < len(embeds) - 1 else 0
+            pos -= 1 if reaction.emoji == "⬅" and pos > 0 else 0
+            await message.edit(embed=embeds[pos])
         if can_remove_reacts:
             await message.clear_reactions()
         return message
+
+    async def table(self, data, *, title, label):
+        '''List a data set in sorted table form.
+        The data argument must be a mapping with Union[str, Member, User] keys and int values.'''
+        def format(key):   # Remove special characters that render poorly in single line code blocks
+            if type(key) is str:
+                return f"{key[:29]}..." if len(key) > 32 else key
+            return "".join(c if ord(c) < 128 else "-" for c in key.display_name)
+        content = f"__**{title.upper()}:**__\n\n"
+        content += "\n".join(f"`{i:02}) {format(key):<32}|` {self.ona.plural(value, label)}"
+                             for i, (key, value) in enumerate(sorted(data.items(),
+                                                                     key=lambda item: item[1], reverse=True)[:20], 1))
+        await self.send(content)
 
     async def clean_up(self, *messages):
         '''When done with a command, call clean_up with an argument-list of messages to delete them all
@@ -134,12 +146,12 @@ class OnaContext(commands.Context):
         return message
 
     async def staff_log(self, content="", *, fields=[]):
-        '''If this setting is provided, it will log staff commands to the specified channel.'''
-        logs = self.guild_doc.staff_logs
-        if not logs:     # Do nothing when a guild has no staff_logs setting specified, or in a PrivateChannel
+        '''Log staff commands to the specified staff_logs channel.'''
+        staff_logs = self.guild_doc.staff_logs
+        if not staff_logs:     # Do nothing when a guild has no staff_logs setting specified, or in a PrivateChannel
             return
         embed = self.ona.embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
-        await self.guild.get_channel(logs).send(embed=embed)
+        await self.guild.get_channel(staff_logs).send(embed=embed)
 
     async def get_last_url(self, count=1):
         '''For commands that require one or more images, first check if the user attached or linked a image.

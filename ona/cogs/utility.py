@@ -1,8 +1,10 @@
 import time
+import re
 import asyncio
 import discord
 from json import loads
 from datetime import datetime, timedelta
+from collections import defaultdict
 from html.parser import HTMLParser
 from discord.ext import commands
 
@@ -43,9 +45,9 @@ class Utility(commands.Cog):
                   ("Members", f"{ctx.guild.member_count:,}"), ("Boosts", ctx.guild.premium_subscription_count),
                   ("Roles", len(ctx.guild.roles)), ("Created", ctx.guild.created_at.strftime("%b %d, %Y")),
                   ("Channels", f"{len(ctx.guild.text_channels)} text, {len(ctx.guild.voice_channels)} voice"),
-                  ("Static Emotes", (f"{len([str(emoji) for emoji in ctx.guild.emojis if not emoji.animated])}"
+                  ("Static Emotes", (f"{sum(1 for emoji in ctx.guild.emojis if not emoji.animated)}"
                                      f" / {ctx.guild.emoji_limit}")),
-                  ("Animated Emotes", (f"{len([str(emoji) for emoji in ctx.guild.emojis if emoji.animated])}"
+                  ("Animated Emotes", (f"{sum(1 for emoji in ctx.guild.emojis if emoji.animated)}"
                                        f" / {ctx.guild.emoji_limit}"))]
         thumbnail = ctx.guild.icon_url_as(format="png")
         embed = self.ona.embed(title=ctx.guild.name, thumbnail=thumbnail, fields=fields)
@@ -60,8 +62,7 @@ class Utility(commands.Cog):
 
     @commands.command(aliases=["emoji", "e"])
     async def emote(self, ctx, emoji: discord.PartialEmoji):
-        '''Get a fullsize image for an emote.
-        Only works for emotes in servers Ona shares.'''
+        '''Get a fullsize image for an emote.'''
         await ctx.send(asset=emoji.url)
 
     @commands.command(aliases=["info", "member", "member_info", "userinfo", "user_info"])
@@ -84,6 +85,86 @@ class Utility(commands.Cog):
         if member.color.value:
             embed.color = member.color
         await ctx.send(embed=embed)
+
+    @commands.command(aliases=["edit_bio", "addbio", "add_bio"])
+    @commands.cooldown(1, 60, commands.BucketType.user)
+    async def editbio(self, ctx):
+        '''Save a bio of yourself to your profile.'''
+        questions = self.ona.config.questions
+        with ctx.author_doc_ctx() as author_doc:
+            if author_doc.bio:
+                content = ("You already have a bio saved. When editing your bio, type 'same' to use the same response "
+                           "as the last time you edited your bio. Would you like to edit your bio now?")
+                self.ona.assert_(await ctx.prompt(content), error="The bio will not be edited.")
+            else:
+                content = (f"You will be asked {len(questions)} questions, answer them however you like. You have "
+                           f"{self.ona.config.response_timeout} seconds per question. If you don't want to provide "
+                           "a response to a question, just say 'skip'. Would you like to start?")
+                self.ona.assert_(await ctx.prompt(content), error="The bio was cancelled.")
+            for field_name, question in questions.items():
+                answer = await ctx.ask(question)
+                if answer.lower() != "skip":
+                    if answer.lower() != "same":
+                        author_doc.bio[field_name] = answer
+                        await ctx.send(f"The `{field_name.title()}` field has been updated.", delete_after=2)
+                    else:
+                        await ctx.send(f"The `{field_name.title()}` field will stay the same.", delete_after=2)
+                else:
+                    if field_name in author_doc.bio:
+                        author_doc.bio.pop(field_name)
+                    await ctx.send(f"The `{field_name.title()}` field was skipped.", delete_after=2)
+                await asyncio.sleep(2)
+        await ctx.send("The new bio has been saved.")
+
+    @commands.command()
+    async def bio(self, ctx, member: discord.Member = None):
+        '''See another member's bio if they've made one with the editbio command.'''
+        member = member or ctx.author
+        bio = defaultdict(str, self.ona.user_db.get_doc(member).bio)
+        self.ona.assert_(bio, error="This user has yet to add a bio.")
+        fields = [("Age", bio["age"]), ("Birthday", bio["birthday"]), ("Nationality", bio["nationality"]),
+                  ("Gender", bio["gender"]), ("Sexuality", bio["sexuality"]), ("Favorite TV Shows", bio["tv_shows"]),
+                  ("Favorite Games", bio["games"]), ("Favorite Movies", bio["movies"]),
+                  ("Favorite Anime", bio["anime"])]
+        fields = [(name, value) for name, value in fields if value != ""]
+        print(fields)
+        thumbnail = bio["avatar"] if re.search(r"(http(s?):)([/|.|\w|\s|-])*\.(?:jpe?g|gif|png)", bio["avatar"]) else ""
+        embed = self.ona.embed(bio["more_info"], title=f"{member.display_name}'s Bio",
+                               thumbnail=thumbnail, fields=fields)
+        embed.url = bio["social_media"] if re.search(r"(http(s?):)([/|.|\w|\s|-])*", bio["social_media"]) else ""
+        await ctx.send(embed=embed)
+
+    @commands.command(aliases=["vote", "strawpoll"])
+    @commands.cooldown(1, 20, commands.BucketType.user)
+    @commands.guild_only()
+    async def poll(self, ctx, *, options: commands.clean_content = ""):
+        '''Create a poll for members in the channel to vote on.
+        Separate options using the " | " character.'''
+        options = options or await ctx.ask("Give a list of options for the poll, separated by the `|` character:")
+        letters = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
+        options = dict(zip(letters, options.split("|")))
+        self.ona.assert_(len(options) > 1, error="Only one option provided. Separate options with the `|` character.")
+        embed = self.ona.embed("\n\n".join(f"{letter} {option}" for letter, option in options.items()),
+                               title=f"{ctx.author.display_name}'s Poll")
+        poll = await ctx.send(f"{ctx.author.mention} React with ⏹ when you'd like to end the poll.", embed=embed)
+        for letter in options:
+            await poll.add_reaction(letter)
+        await poll.add_reaction("⏹")
+
+        def check(r, u):
+            return u == ctx.author and r.message.id == poll.id and r.emoji == "⏹"
+        await self.ona.wait_for("reaction_add", check=check)    # Continue only after author reacts with the stop emote
+        votes = defaultdict(list)
+        for reaction in (await ctx.channel.fetch_message(poll.id)).reactions:
+            if reaction.custom_emoji or reaction.emoji not in options:   # Ignore miscellaneous reacts
+                continue
+            async for member in reaction.users().filter(lambda u: not u.bot):
+                if not any(member == existing_member for emoji in votes for existing_member in votes[emoji]):
+                    votes[reaction.emoji].append(member)    # Ignore duplicate votes
+        if ctx.channel.permissions_for(ctx.me).manage_messages:
+            await poll.clear_reactions()
+        await ctx.table({options[letter]: len(voters) for letter, voters in votes.items()},
+                        title="final results", label="vote")
 
     @commands.command(aliases=["np", "now_playing"])
     async def nowplaying(self, ctx, member: discord.Member = None):

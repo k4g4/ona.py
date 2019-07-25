@@ -3,7 +3,7 @@ import discord
 from io import BytesIO
 from typing import Optional
 from discord.ext import commands
-from PIL import Image, ImageFilter, ImageDraw, ImageFont, ImageSequence
+from PIL import Image, ImageFilter, ImageDraw, ImageFont, ImageSequence, ImageOps
 
 
 class Fun(commands.Cog):
@@ -63,8 +63,7 @@ class Fun(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def resize(self, ctx, magnification: Optional[float]):
         '''Resize an image.
-        The magnification value can be any value, including a decimal.
-        The new image may not be greater than 5,000x5,000.'''
+        The magnification value can be any value, including a decimal.'''
         try:
             magnification = magnification or float(await ctx.ask("Give a value to resize the image by:"))
         except ValueError:
@@ -106,11 +105,18 @@ class Fun(commands.Cog):
         await ctx.send(file=await self.edit_image(await ctx.get_last_url(),
                                                   lambda image, data: image.convert("RGBA").filter(filter)))
 
+    @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.channel)
+    async def invert(self, ctx):
+        '''Invert an image.'''
+        await ctx.send(file=await self.edit_image(await ctx.get_last_url(),
+                                                  lambda image, data: ImageOps.invert(image.convert("RGB"))))
+
     @commands.command(aliases=["caption"])
     @commands.cooldown(1, 5, commands.BucketType.channel)
     async def meme(self, ctx, *, caption: commands.clean_content = None):
         '''Make a meme using any image and a caption.
-        Separate top from bottom text using the '|' character.'''
+        Separate top from bottom text using the " | " character.'''
         caption = caption or await ctx.ask("Provide a caption for the image:")
         url = await ctx.get_last_url()
         caption = caption.replace(url, "")      # If the url is in the command, remove it
@@ -161,9 +167,11 @@ class Fun(commands.Cog):
         '''Create a gif from the last few images in the channel.'''
         new_gif = BytesIO()
         images = [Image.open(BytesIO(await self.ona.request(url))) for url in await ctx.get_last_url(count=count)]
+        new_size = max(image.size for image in images)  # Returns the size with either the largest height or width
+        images = [frame.resize(new_size, Image.LANCZOS) for image in images for frame in ImageSequence.Iterator(image)]
         images[0].save(new_gif, format="GIF", save_all=True, append_images=images[1:], optimize=True, loop=0)
         new_gif.seek(0)
-        await ctx.send(file=discord.File(new_gif, "new_gif.gif"))
+        await ctx.send(file=discord.File(new_gif, f"{ctx.message.id}.gif"))
 
     @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)
