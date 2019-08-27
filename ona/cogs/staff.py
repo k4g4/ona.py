@@ -1,5 +1,7 @@
 import asyncio
 import discord
+from io import BytesIO
+from datetime import datetime, timedelta
 from json import loads, JSONDecodeError
 from typing import Optional
 from discord.ext import commands
@@ -11,6 +13,23 @@ class Staff(commands.Cog):
     def __init__(self, ona):
         self.ona = ona
         self.r9k_message_cache = []
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    @commands.bot_has_permissions(manage_messages=True)
+    async def spoiler(self, ctx, member: Optional[discord.Member]):
+        '''Delete the last post in the channel from the member and repost it as a spoiler.'''
+        if member:
+            message = await ctx.history().get(author=member)
+        else:
+            message = await ctx.history(before=ctx.message).next()
+        content = f"{message.author.display_name}'s message:\n||{message.content}||"
+        if message.attachments:
+            filename = f"SPOILER_{message.attachments[0].filename}"
+            await ctx.send(content, file=discord.File(BytesIO(await message.attachments[0].read()), filename))
+        elif content:
+            await ctx.send(content)
+        await message.delete()
 
     @commands.command()
     @commands.has_permissions(kick_members=True)
@@ -162,13 +181,23 @@ class Staff(commands.Cog):
     @commands.command(aliases=["purge"])
     @commands.has_permissions(manage_messages=True)
     @commands.bot_has_permissions(manage_messages=True)
-    async def prune(self, ctx, filter: Optional[discord.Member], count: int):
-        '''Prune multiple messages from a channel.
+    async def prune(self, ctx, filter: Optional[discord.Member], count: int, unit=None):
+        '''Prune multiple messages from a channel. If a unit of time is provided, a time range will be pruned.
         If a member is provided, only that member's messages are removed out of the number of messages given.'''
-        self.ona.assert_(0 < count < self.ona.config.max_prune,
-                         error=f"The number of messages must be positive and fewer than {self.ona.config.max_prune}.")
         await ctx.message.delete()
-        pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
+        if unit:
+            multiplier = {"minute": 60, "minutes": 60, "hour": 3600, "hours": 3600}.get(unit.lower(), 1)
+            since = timedelta(seconds=count * multiplier)
+            self.ona.assert_(timedelta() < since <= timedelta(hours=self.ona.config.max_prune_hours),
+                             error=("The time range must be positive "
+                                    f"and at most {self.ona.config.max_prune_hours} hours."))
+            pruned = await ctx.channel.purge(after=datetime.utcnow() - since,
+                                             check=lambda m: not filter or m.author == filter)
+        else:
+            self.ona.assert_(0 < count <= self.ona.config.max_prune,
+                             error=("The number of messages must be positive "
+                                    f"and at most {self.ona.config.max_prune}."))
+            pruned = await ctx.channel.purge(limit=count, check=lambda m: not filter or m.author == filter)
         content = f"Pruned {self.ona.plural(len(pruned), 'message')}."
         await ctx.send(content)
         fields = [("Channel", ctx.channel.mention)]
@@ -199,7 +228,7 @@ class Staff(commands.Cog):
     async def r9k_listener(self, message):
         if message.channel.id not in self.ona.guild_db.get_doc(message.guild).r9k:
             return
-        if message.channel.permissions_for(message.author).administrator:
+        if message.channel.permissions_for(message.author).administrator or message.author.bot:
             return
         if len(message.content) < self.ona.config.min_r9k_char:
             return

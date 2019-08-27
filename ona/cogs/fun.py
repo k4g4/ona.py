@@ -174,6 +174,17 @@ class Fun(commands.Cog):
         await ctx.send(file=discord.File(new_gif, f"{ctx.message.id}.gif"))
 
     @commands.command()
+    @commands.bot_has_permissions(manage_webhooks=True)
+    async def impersonate(self, ctx, member: discord.Member, *, content=None):
+        '''Send a message pretending to be someone else.'''
+        file = None
+        if ctx.message.attachments:
+            file = discord.File(BytesIO(await ctx.message.attachments[0].read()), ctx.message.attachments[0].filename)
+        self.ona.assert_(content or file, error="No message provided.")
+        await self.ona.send_webhook(ctx.channel, content, username=member.display_name, avatar_url=member.avatar_url,
+                                    file=file)
+
+    @commands.command()
     @commands.cooldown(3, 20, commands.BucketType.user)
     async def quote(self, ctx, member: discord.Member, number: Optional[int]):
         '''Bring up quotes from another member.

@@ -4,8 +4,6 @@ import discord
 from io import BytesIO
 from discord.ext import commands
 
-char_limit = 2000
-
 
 class OnaContext(commands.Context):
     '''Custom Context class with some quality of life attributes.'''
@@ -36,14 +34,16 @@ class OnaContext(commands.Context):
     async def send(self, content="", *, multi=False, asset=None, staff_log=False, **kwargs):
         '''This custom send method adds the ability to send messages larger than the
         Discord character limit as well as the ability to specify an asset as the attachment.'''
+        if asset:
+            kwargs["file"] = discord.File(BytesIO(await asset.read()), self.ona.filename_from_url(str(asset)))
+        content = self.ona.sanitize(content)
+        if staff_log:
+            await self.staff_log(content)
+        char_limit = 2000
         if multi:
             while len(content) > char_limit:
                 await super().send(content[:char_limit])
                 content = content[char_limit:]
-        if asset:
-            kwargs["file"] = discord.File(BytesIO(await asset.read()), self.ona.filename_from_url(str(asset)))
-        if staff_log:
-            await self.staff_log(content)
         return await super().send(content, **kwargs)
 
     async def prompt(self, content="", **kwargs):
@@ -150,8 +150,11 @@ class OnaContext(commands.Context):
         staff_logs = self.guild_doc.staff_logs
         if not staff_logs:     # Do nothing when a guild has no staff_logs setting specified, or in a PrivateChannel
             return
-        embed = self.ona.embed(content, title="Staff Logger", timestamp=True, author=self.author, fields=fields)
-        await self.guild.get_channel(staff_logs).send(embed=embed)
+        embed = self.ona.embed(content, title="Staff Logger", timestamp=True, fields=fields)
+        author_name = self.author.display_name
+        username = f"Action from {author_name if len(author_name) <= 20 else author_name[:17] + '...'}"
+        await self.ona.send_webhook(self.guild.get_channel(staff_logs), username=username,
+                                    avatar_url=self.author.avatar_url, embed=embed)
 
     async def get_last_url(self, count=1):
         '''For commands that require one or more images, first check if the user attached or linked a image.

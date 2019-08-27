@@ -142,10 +142,11 @@ class Utility(commands.Cog):
         Separate options using the " | " character.'''
         options = options or await ctx.ask("Give a list of options for the poll, separated by the `|` character:")
         letters = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
-        options = dict(zip(letters, options.split("|")))
+        options = dict(zip(letters, (option.strip() for option in options.split("|"))))
         self.ona.assert_(len(options) > 1, error="Only one option provided. Separate options with the `|` character.")
         embed = self.ona.embed("\n\n".join(f"{letter} {option}" for letter, option in options.items()),
                                title=f"{ctx.author.display_name}'s Poll")
+        embed.set_footer(text="Only one vote is counted per member.")
         poll = await ctx.send(f"{ctx.author.mention} React with ⏹ when you'd like to end the poll.", embed=embed)
         for letter in options:
             await poll.add_reaction(letter)

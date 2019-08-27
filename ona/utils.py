@@ -50,10 +50,22 @@ class OnaUtilsMixin:
             params["searchType"] = "image"
         return (await self.request("https://www.googleapis.com/customsearch/v1", params=params))["items"]
 
+    async def send_webhook(self, channel, content=None, *, username=None, avatar_url=None, file=None, embed=None):
+        '''Abstract the use of webhooks for a TextChannel. If Ona doesn't have the manage_webhooks permission,
+        the message will be sent normally instead.'''
+        if isinstance(channel, discord.TextChannel) and channel.permissions_for(channel.guild.me).manage_webhooks:
+            webhooks = await channel.webhooks()
+            if not webhooks:
+                webhooks.append(await channel.create_webhook(name="Ona Webhook"))
+            await webhooks[0].send(self.sanitize(content), username=username or channel.guild.me.display_name,
+                                   avatar_url=avatar_url or self.user.avatar_url, file=file, embed=embed)
+        else:
+            await channel.send(self.sanitize(content), file=file, embed=embed)
+
     @staticmethod
     def plural(value, word):
         value = int(value) if float(value).is_integer() else value  # Remove .0 if it exists
-        return f"one {word}" if value == 1 else f"{value:,} {word}s"
+        return f"1 {word}" if value == 1 else f"{value:,} {word}s"
 
     @staticmethod
     def filename_from_url(url):
@@ -62,6 +74,10 @@ class OnaUtilsMixin:
     @staticmethod
     def ordinal(n):
         return str(n) + ({1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th") if n % 100 < 10 or 20 < n % 100 else "th")
+
+    @staticmethod
+    def sanitize(s):
+        return s.replace("@everyone", "everyone").replace("@here", "here") if s else None
 
 
 # Various command checks
