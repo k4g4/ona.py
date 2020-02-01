@@ -15,6 +15,7 @@ class Ona(commands.Bot, OnaUtilsMixin):
     '''A multipurpose Discord bot developed by Kaga#0690.'''
 
     def __init__(self):
+        self.case_insensitive = True
         self.uptime = datetime.utcnow()
         # Configs are stored as attributes
         for filename in os.listdir(os.path.join(dir, "config")):

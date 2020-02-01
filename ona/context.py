@@ -36,7 +36,7 @@ class OnaContext(commands.Context):
         Discord character limit as well as the ability to specify an asset as the attachment.'''
         if asset:
             kwargs["file"] = discord.File(BytesIO(await asset.read()), self.ona.filename_from_url(str(asset)))
-        content = self.ona.sanitize(content)
+        content = self.ona.sanitize(str(content))
         if staff_log:
             await self.staff_log(content)
         char_limit = 2000
@@ -121,7 +121,7 @@ class OnaContext(commands.Context):
         def format(key):   # Remove special characters that render poorly in single line code blocks
             if type(key) is str:
                 return f"{key[:29]}..." if len(key) > 32 else key
-            return "".join(c if ord(c) < 128 else "-" for c in key.display_name)
+            return self.ona.asciify(key.display_name)
         content = f"__**{title.upper()}:**__\n\n"
         content += "\n".join(f"`{i:02}) {format(key):<32}|` {self.ona.plural(value, label)}"
                              for i, (key, value) in enumerate(sorted(data.items(),

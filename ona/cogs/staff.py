@@ -1,10 +1,11 @@
+import re
 import asyncio
 import discord
 from io import BytesIO
 from datetime import datetime, timedelta
 from json import loads, JSONDecodeError
 from typing import Optional
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 
 class Staff(commands.Cog):
@@ -13,6 +14,10 @@ class Staff(commands.Cog):
     def __init__(self, ona):
         self.ona = ona
         self.r9k_message_cache = []
+        self.announce_events.start()
+
+    def cog_unload(self):
+        self.announce_events.cancel()
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -282,6 +287,32 @@ class Staff(commands.Cog):
             member_doc.quotes.pop(number - 1)
         await ctx.send(f"{member.display_name}'s {self.ona.ordinal(number)} quote has been removed.", staff_log=True)
 
+    @commands.command(aliases=["give_perm"])
+    @commands.has_permissions(administrator=True)
+    async def giveperm(self, ctx, member: discord.Member, perm=None):
+        '''Give a member a role with a designated permission.'''
+        perm = perm.lower() or (await ctx.ask(f"Give a permission for {member.display_name}:")).lower()
+        with ctx.guild_doc_ctx() as guild_doc:
+            role_id = guild_doc[perm]
+            self.ona.assert_(role_id, error=f"The {perm.title()} role has not been assigned.")
+            role = ctx.guild.get_role(role_id)
+            self.ona.assert_(role not in member.roles, error=f"{member.display_name} already has this permission.")
+            await member.add_roles(role)
+        await ctx.send(f"{member.display_name} has been given the {perm.title()} permission.", staff_log=True)
+
+    @commands.command(aliases=["remove_perm"])
+    @commands.has_permissions(administrator=True)
+    async def removeperm(self, ctx, member: discord.Member, perm=None):
+        '''Remove a permission from a member.'''
+        perm = perm.lower() or (await ctx.ask(f"Give a permission to take from {member.display_name}:")).lower()
+        with ctx.guild_doc_ctx() as guild_doc:
+            role_id = guild_doc[perm]
+            self.ona.assert_(role_id, error=f"The {perm.title()} role has not been assigned.")
+            role = ctx.guild.get_role(role_id)
+            self.ona.assert_(role in member.roles, error=f"{member.display_name} doesn't have this permission.")
+            await member.remove_roles(role)
+        await ctx.send(f"{member.display_name} has lost the {perm.title()} permission.", staff_log=True)
+
     @commands.command()
     @commands.has_permissions(manage_guild=True)
     @commands.bot_has_permissions(manage_guild=True)
@@ -325,6 +356,84 @@ class Staff(commands.Cog):
             member_doc.money += money
         content = f"{member.display_name} {'gained' if money >= 0 else 'lost'} {abs(money)} {ctx.guild_doc.currency}."
         await ctx.send(content, staff_log=True)
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    @commands.bot_has_permissions(manage_messages=True)
+    async def censor(self, ctx, *, pattern):
+        '''Censor a regex pattern from the guild.'''
+        pattern = pattern or await ctx.ask("Give a regex pattern to censor with:")
+        with ctx.guild_doc_ctx() as guild_doc:
+            guild_doc.censored.append(pattern)
+        content = f"Messages with `{pattern}` will now be censored."
+        await ctx.send(content)
+        await ctx.staff_log(content)
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def uncensor(self, ctx, *, pattern):
+        '''Uncensor a regex pattern from the guild.'''
+        pattern = pattern or await ctx.ask("Give a regex pattern to remove:")
+        self.ona.assert_(pattern in ctx.guild_doc.censored, error=f"`{pattern}` is not a censored pattern.")
+        with ctx.guild_doc_ctx() as guild_doc:
+            guild_doc.censored.remove(pattern)
+        content = f"Messages with `{pattern}` will no longer be censored."
+        await ctx.send(content)
+        await ctx.staff_log(content)
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def censored(self, ctx):
+        '''View a list of censored regex patterns.'''
+        self.ona.assert_(ctx.guild_doc.censored, error="There are no censored patterns.")
+        censored_list = "__**CENSORED:**__\n\n▫ `" + "`\n▫ `".join(ctx.guild_doc.censored) + "`"
+        await ctx.send(censored_list)
+
+    @commands.Cog.listener(name="on_message")
+    async def chat_censor(self, message):
+        if message.guild and not message.guild.me.permissions_in(message.channel).manage_messages:
+            return
+        for pattern in self.ona.guild_db.get_doc(message.guild).censored:
+            if re.search(pattern, message.content, re.IGNORECASE):
+                self.ona.staff_deleted.append(message.id)
+                await message.delete()
+                return
+
+    @commands.command(aliases=["event"])
+    async def schedule(self, ctx, *, description=""):
+        '''Create an event in the server. The event's description will
+        be posted in the specified announcements channel on the given date.'''
+        description = description or await ctx.ask("Give a description for the event:")
+        date = await ctx.ask("Give the date for this event in MM/DD format:")
+        self.ona.assert_("/" in date, error="Invalid date format.")
+        month, day = date.split("/")
+        self.ona.assert_(month.isdigit(), day.isdigit(), error="Invalid date format.")
+        self.ona.assert_(0 < int(month) <= 12, 0 < int(day) <= 31, error="Invalid date.")
+        with ctx.guild_doc_ctx() as guild_doc:
+            guild_doc.events.append({"month": int(month), "day": int(day), "description": description})
+        content = f"`{description}` has been scheduled for {month}/{day}."
+        await ctx.send(content)
+        await ctx.staff_log(content)
+
+    @tasks.loop(minutes=30)
+    async def announce_events(self):
+        now = datetime.utcnow()
+        with self.ona.guild_db.doc_context(self.ona.get_guild(self.ona.config.main_guild)) as guild_doc:
+            if not guild_doc.announcements:
+                return
+            for event in list(guild_doc.events):
+                if (event["month"], event["day"]) == (now.month, now.day) and now.hour == 8:
+                    await self.ona.get_channel(guild_doc.announcements).send(event["description"])
+                    guild_doc.events.remove(event)
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def welcome(self, ctx, member: discord.Member = None):
+        '''Create a welcome message for someone.'''
+        member = member or ctx.message.author
+        welcome_image = await self.ona.create_welcome(member)
+        await ctx.send(f"Welcome to Tenshi Paradise, {member.mention} <a:stockingBlush:649595125307015200>\n",
+                       file=discord.File(welcome_image, f"{member.id}_{ctx.guild.member_count}.png"))
 
 
 def setup(ona):

@@ -43,7 +43,7 @@ class Events(commands.Cog):
     async def on_message_delete(self, message):
         if message.author.bot:
             return
-        if not message.guild:   # Assum we're in a guild after this point
+        if not message.guild:   # Assume we're in a guild after this point
             return
         logs = self.ona.guild_db.get_doc(message.guild).logs
         if not logs:     # Do nothing when a guild has no logs setting specified, or in a PrivateChannel
@@ -53,6 +53,20 @@ class Events(commands.Cog):
             embed.set_image(url=message.attachments[0].proxy_url)
             embed.add_field(name="Filename", value=message.attachments[0].filename)
         await message.guild.get_channel(logs).send(embed=embed)
+
+    @event()
+    async def on_member_join(self, member):
+        guild_doc = self.ona.guild_db.get_doc(member.guild)
+        general = member.guild.get_channel(guild_doc.general)
+        try:
+            welcome_image = await self.ona.create_welcome(member)
+            await general.send(f"Welcome to Tenshi Paradise, {member.mention} <a:stockingBlush:649595125307015200>\n",
+                               file=discord.File(welcome_image, f"{member.id}_{member.guild.member_count}.png"))
+        except Exception as e:
+            print(e)
+            await general.send(f"Welcome to Tenshi Paradise, {member.mention} <a:stockingBlush:649595125307015200>\n")
+        finally:
+            await member.add_roles(discord.Object(393973228818661378))
 
     @event()
     async def on_member_update(self, initial, member):
@@ -91,7 +105,7 @@ class Events(commands.Cog):
             print(error_text)
             embed = self.ona.embed(error_text, timestamp=True, author=self.ona.user)
             main_guild = self.ona.get_guild(self.ona.config.main_guild)
-            await main_guild.get_channel(self.ona.guild_db.get_doc(main_guild).logs).send(embed=embed)
+            await (await self.ona.fetch_channel(self.ona.guild_db.get_doc(main_guild).logs)).send(embed=embed)
             return
         await ctx.clean_up(await ctx.send(f"{error_text} {self.ona.config.error}"))
 

@@ -1,5 +1,7 @@
 import time
 import re
+import os
+import youtube_dl
 import asyncio
 import discord
 from json import loads
@@ -211,9 +213,29 @@ class Utility(commands.Cog):
     @commands.cooldown(2, 15, commands.BucketType.user)
     async def youtube(self, ctx, *, query=""):
         '''Search for a video on YouTube.'''
-        query = query if query else await ctx.ask("Give a word or phrase to search:")
+        query = query or await ctx.ask("Give a word or phrase to search:")
         results = await self.ona.google_search(f"youtube {query}")
         await ctx.send(next(item["link"] for item in results if "youtube.com/watch" in item["link"]))
+
+    @commands.command(aliases=["youtubedl", "ytdl", "ytdownload"])
+    @commands.cooldown(1, 10, commands.BucketType.guild)
+    async def youtubedownload(self, ctx, url=""):
+        '''Download a youtube video as an MP3 file.'''
+        url = url or await ctx.ask("Give a youtube video link to download:")
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": f"{ctx.message.id}.%(ext)s",
+            "postprocessors": [
+                {"key": "FFmpegExtractAudio","preferredcodec": "mp3", "preferredquality": "192"},
+                {"key": "FFmpegMetadata"},
+            ]
+        }
+        loading = await ctx.send("Now downloading...")
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+        await ctx.send(file=discord.File(f"{ctx.message.id}.mp3", filename=info["title"].replace(" ", "_") + ".mp3"))
+        await loading.delete()
+        os.remove(f"{ctx.message.id}.mp3")
 
     @commands.command()
     @commands.cooldown(2, 15, commands.BucketType.user)

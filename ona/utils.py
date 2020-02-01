@@ -1,8 +1,13 @@
-from aiohttp import ClientSession
+import os
+import random
+import itertools
 import discord
+from aiohttp import ClientSession
 from contextlib import contextmanager
 from datetime import timedelta, datetime
 from discord.ext import commands
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 
 
 class OnaUtilsMixin:
@@ -33,6 +38,45 @@ class OnaUtilsMixin:
         for field in fields:
             embed.add_field(name=field[0], value=field[1])
         return embed
+
+    async def create_welcome(self, member):
+        '''Creates a welcome banner for the given member.'''
+        welcome = Image.open(os.path.join(self.resources["welcomes"],
+                             random.choice(os.listdir(self.resources["welcomes"]))))
+        avi = Image.open(BytesIO(await member.avatar_url_as(static_format="png", size=64).read()))
+        draw = ImageDraw.Draw(welcome)
+        member_name = self.asciify(member.name)
+        member_name = f"{member_name[:12]}..." if len(member_name) > 32 else member_name
+        top_text = f"Welcome,\n{member_name}"
+        bot_text = f"You're our {self.ordinal(member.guild.member_count)} member!"
+        top_font_size, bot_font_size = 80, 55
+        top_font = ImageFont.truetype(self.resources["tenshi_font"], top_font_size)
+        bot_font = ImageFont.truetype(self.resources["tenshi_font"], bot_font_size)
+        text_size = draw.multiline_textsize(top_text, font=top_font)[0] // 2
+        top_text_x, top_text_y = 670, 170
+        bot_text_x, bot_text_y = 375, 350
+        top_outline, bot_outline = 2, 2
+        white = (255, 255, 255, 255)
+        blue = (15, 90, 170, 255)
+        for x_offset, y_offset in itertools.product((-2, 2), (-2, 2)):      # Draw the outline around the text
+            draw.multiline_text((top_text_x - text_size + x_offset, top_text_y + y_offset), top_text,
+                                align="center", font=top_font, fill=white)
+            draw.multiline_text((bot_text_x + x_offset, bot_text_y + y_offset), bot_text,
+                                align="center", font=bot_font, fill=white)
+        draw.multiline_text((top_text_x - text_size, top_text_y), top_text, # Draw the top text and bottom text
+                            align="center", font=top_font, fill=blue)
+        draw.multiline_text((bot_text_x, bot_text_y), bot_text,
+                            align="center", font=bot_font, fill=blue)
+        size = 165
+        avi = avi.resize((size, size))
+        circle = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(circle).ellipse((0, 0, size, size), fill=255)
+        avi.putalpha(circle)
+        welcome.alpha_composite(avi, (20, 150))
+        welcome_image = BytesIO()
+        welcome.save(welcome_image, format="PNG")
+        welcome_image.seek(0)
+        return welcome_image
 
     async def request(self, url, *, method="GET", **kwargs):
         '''This helper coroutine makes a request to a url.
@@ -65,7 +109,7 @@ class OnaUtilsMixin:
     @staticmethod
     def plural(value, word):
         value = int(value) if float(value).is_integer() else value  # Remove .0 if it exists
-        return f"1 {word}" if value == 1 else f"{value:,} {word}s"
+        return f"1 {word}" if abs(value) == 1 else f"{value:,} {word}s"
 
     @staticmethod
     def filename_from_url(url):
@@ -73,11 +117,15 @@ class OnaUtilsMixin:
 
     @staticmethod
     def ordinal(n):
-        return str(n) + ({1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th") if n % 100 < 10 or 20 < n % 100 else "th")
+        return f"{n:,}" + ({1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th") if n % 100 < 10 or 20 < n % 100 else "th")
 
     @staticmethod
     def sanitize(s):
         return s.replace("@everyone", "everyone").replace("@here", "here") if s else None
+
+    @staticmethod
+    def asciify(s):
+        return "".join(c if ord(c) < 128 else "-" for c in s)
 
 
 # Various command checks
